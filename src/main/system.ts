@@ -1,8 +1,10 @@
-import si from 'systeminformation'
+import si, { type Systeminformation } from 'systeminformation'
 import type { SystemSnapshot, SystemStatic } from '@shared/types'
 
 const TICK_MS = 1000
 const SLOW_TICK_MS = 5000
+// On macOS si.mem() spawns two helper processes per call, so memory is read every other tick.
+const MEM_TICK_MS = 2000
 
 type Slow = Pick<SystemSnapshot, 'battery' | 'temp'>
 
@@ -11,6 +13,8 @@ let slowCache: Slow = {
   temp: { main: null, max: null }
 }
 let lastSlowAt = 0
+let memCache: Systeminformation.MemData | null = null
+let lastMemAt = 0
 
 async function readSlow(): Promise<Slow> {
   const [bat, temp] = await Promise.all([si.battery(), si.cpuTemperature()])
@@ -30,7 +34,13 @@ async function readSlow(): Promise<Slow> {
 }
 
 async function sample(): Promise<SystemSnapshot> {
-  const [load, mem, net] = await Promise.all([si.currentLoad(), si.mem(), si.networkStats()])
+  const needMem = !memCache || Date.now() - lastMemAt >= MEM_TICK_MS
+  const [load, freshMem, net] = await Promise.all([si.currentLoad(), needMem ? si.mem() : null, si.networkStats()])
+  if (freshMem) {
+    memCache = freshMem
+    lastMemAt = Date.now()
+  }
+  const mem = memCache!
 
   if (Date.now() - lastSlowAt > SLOW_TICK_MS) {
     lastSlowAt = Date.now()
@@ -64,11 +74,15 @@ export async function readStatic(): Promise<SystemStatic> {
   }
 }
 
-/** Samples the system once per second and hands each snapshot to `emit`. Returns a stop function. */
-export function startMonitor(emit: (s: SystemSnapshot) => void): () => void {
+/**
+ * Samples the system once per second and hands each snapshot to `emit`. Sampling
+ * pauses entirely while `isActive()` is false (window minimized or hidden), so the
+ * app costs nothing in the background. Returns a stop function.
+ */
+export function startMonitor(emit: (s: SystemSnapshot) => void, isActive: () => boolean): () => void {
   let busy = false
   const timer = setInterval(async () => {
-    if (busy) return
+    if (busy || !isActive()) return
     busy = true
     try {
       emit(await sample())

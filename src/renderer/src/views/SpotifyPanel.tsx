@@ -49,6 +49,11 @@ type Mode = 'control' | 'embed'
 export function SpotifyPanel({ embed }: { embed: ReactNode }) {
   const [status, setStatus] = useState<SpotifyStatus | null>(null)
   const [mode, setMode] = useState<Mode>('control')
+  // The Spotify iframe is a full extra web process (~100 MB); only create it once the user opens Embed.
+  const [embedMounted, setEmbedMounted] = useState(false)
+  useEffect(() => {
+    if (mode === 'embed') setEmbedMounted(true)
+  }, [mode])
 
   const refreshStatus = useCallback(async () => setStatus(await window.uhub.spotify.status()), [])
   useEffect(() => {
@@ -77,7 +82,7 @@ export function SpotifyPanel({ embed }: { embed: ReactNode }) {
     >
       {/* Both stay mounted so switching modes doesn't stop the embed or reset the controller. */}
       <div hidden={mode !== 'embed'} className="h-full">
-        {embed}
+        {embedMounted && embed}
       </div>
       <div hidden={mode !== 'control'} className="h-full">
         {!status ? (
@@ -220,6 +225,9 @@ function Controller({ status, onLogout, onExpired }: { status: SpotifyStatus; on
   const [showDevices, setShowDevices] = useState(false)
   const [movingHere, setMovingHere] = useState(false)
   const volumeTimer = useRef<number | undefined>(undefined)
+  const rootRef = useRef<HTMLDivElement>(null)
+  // The Media tab stays mounted in the background; `offsetParent` is null while any ancestor is hidden.
+  const onScreen = (): boolean => document.visibilityState === 'visible' && rootRef.current?.offsetParent != null
 
   const handle = useCallback(
     <T,>(res: SpotifyResult<T>): T | undefined => {
@@ -244,9 +252,9 @@ function Controller({ status, onLogout, onExpired }: { status: SpotifyStatus; on
     void loadPlayback()
     void loadDevices()
     void window.uhub.spotify.playlists().then((r) => r.ok && setPlaylists(r.data))
-    const a = setInterval(() => document.visibilityState === 'visible' && void loadPlayback(), POLL_MS)
-    const b = setInterval(() => document.visibilityState === 'visible' && void loadDevices(), DEVICE_POLL_MS)
-    const c = setInterval(() => setNow(Date.now()), 500)
+    const a = setInterval(() => onScreen() && void loadPlayback(), POLL_MS)
+    const b = setInterval(() => onScreen() && void loadDevices(), DEVICE_POLL_MS)
+    const c = setInterval(() => onScreen() && setNow(Date.now()), 1000)
     return () => {
       clearInterval(a)
       clearInterval(b)
@@ -288,7 +296,7 @@ function Controller({ status, onLogout, onExpired }: { status: SpotifyStatus; on
   const nextRepeat = { off: 'context', context: 'track', track: 'off' } as const
 
   return (
-    <div className="flex h-full flex-col gap-3">
+    <div ref={rootRef} className="flex h-full flex-col gap-3">
       {/* Account */}
       <div className="flex items-center gap-2">
         {status.user?.avatar ? <img src={status.user.avatar} className="size-6 rounded-full" alt="" /> : <span className="size-6 rounded-full bg-acid/20" />}
@@ -374,7 +382,7 @@ function Controller({ status, onLogout, onExpired }: { status: SpotifyStatus; on
             }}
           >
             <div className="absolute inset-x-0 top-1/2 h-[3px] -translate-y-1/2 bg-white/10" />
-            <div className="absolute top-1/2 left-0 h-[3px] -translate-y-1/2 bg-acid transition-[width] duration-500 ease-linear" style={{ width: `${pctDone}%` }} />
+            <div className="absolute inset-x-0 top-1/2 h-[3px] origin-left bg-acid transition-transform duration-1000 ease-linear" style={{ transform: `translateY(-50%) scaleX(${pctDone / 100})` }} />
             <div className="absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white opacity-0 transition-opacity group-hover:opacity-100" style={{ left: `${pctDone}%` }} />
           </div>
           <span className="w-8 text-right">{fmt(pb?.durationMs ?? 0)}</span>

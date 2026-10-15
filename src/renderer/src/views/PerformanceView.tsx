@@ -325,7 +325,7 @@ function PowerWidget({ handle, latest }: Omit<WidgetProps, 'history'>) {
   return (
     <Panel title="Energia & Status" icon={<Thermometer />} lead={handle} className="h-[270px]" bodyClassName="flex flex-col gap-4 p-4 pt-3">
       <div className={`flex items-center gap-3 rounded-[3px] border px-3 py-2.5 ${meta.ring}`}>
-        <span className={`size-2.5 rounded-full ${meta.dot} animate-pulse-dot shadow-[0_0_10px_currentColor]`} />
+        <span className={`size-2.5 rounded-full ${meta.dot} ${level === 'normal' ? '' : 'animate-pulse-dot'} shadow-[0_0_10px_currentColor]`} />
         <div>
           <div className="eyebrow">Status do sistema</div>
           <div className={`font-mono text-[15px] font-semibold tracking-wider ${meta.text}`}>{meta.label.toUpperCase()}</div>

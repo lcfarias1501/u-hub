@@ -173,12 +173,10 @@ function Visualizer({ active }: { active: boolean }) {
     const canvas = ref.current!
     const ctx = canvas.getContext('2d')!
     let raf = 0
+    let idle = 0
     let data = new Uint8Array(0)
 
-    const draw = (): void => {
-      raf = requestAnimationFrame(draw)
-      const { clientWidth: w, clientHeight: h } = canvas
-      if (!w || !h) return // tab hidden; resizing to 0 would stick
+    const paint = (w: number, h: number): void => {
       const dpr = window.devicePixelRatio
       if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
         canvas.width = w * dpr
@@ -205,8 +203,24 @@ function Visualizer({ active }: { active: boolean }) {
         ctx.fillRect(i * bw + 1, h - bh, bw - 2, bh)
       }
     }
-    draw()
-    return () => cancelAnimationFrame(raf)
+
+    // Animate only while audio plays and the tab is on screen. While the Media tab is
+    // hidden the canvas measures 0, so we just check back twice a second instead of
+    // spinning requestAnimationFrame for nothing.
+    const tick = (): void => {
+      const { clientWidth: w, clientHeight: h } = canvas
+      if (!w || !h) {
+        idle = window.setTimeout(tick, 500)
+        return
+      }
+      paint(w, h)
+      if (active) raf = requestAnimationFrame(tick)
+    }
+    tick()
+    return () => {
+      cancelAnimationFrame(raf)
+      clearTimeout(idle)
+    }
   }, [active])
 
   // Canvas is a replaced element and won't stretch via inset, so it fills a positioned wrapper instead.

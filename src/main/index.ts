@@ -41,7 +41,10 @@ function createWindow(): void {
     if (url !== win?.webContents.getURL()) e.preventDefault()
   })
 
-  stopMonitor = startMonitor((snap) => win?.webContents.send('system:tick', snap))
+  stopMonitor = startMonitor(
+    (snap) => win?.webContents.send('system:tick', snap),
+    () => !!win && win.isVisible() && !win.isMinimized()
+  )
   win.on('closed', () => {
     stopMonitor?.()
     win = null

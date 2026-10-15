@@ -17,12 +17,13 @@ function Clock() {
 
 export function TopBar({ view }: { view: ViewId }) {
   const { latest } = useSystemFeed()
-  const level = LEVEL_META[systemLevel(latest)]
+  const lvl = systemLevel(latest)
+  const level = LEVEL_META[lvl]
   const item = NAV.find((n) => n.id === view)!
 
   return (
     <header
-      className={`drag relative z-30 flex h-10 shrink-0 items-center gap-4 border-b border-white/[0.06] bg-void/70 pr-4 backdrop-blur-xl ${
+      className={`drag relative z-30 flex h-10 shrink-0 items-center gap-4 border-b border-white/[0.06] bg-void/90 pr-4 ${
         isMac ? 'pl-[84px]' : 'pl-4 pr-[150px]'
       }`}
     >
@@ -42,7 +43,7 @@ export function TopBar({ view }: { view: ViewId }) {
       <div className="no-drag ml-auto flex items-center gap-3 font-mono text-[11px]">
         <UpdateBadge />
         <span className={`flex items-center gap-1.5 rounded-[3px] border px-2 py-0.5 ${level.ring} ${level.text}`}>
-          <span className={`size-1.5 rounded-full ${level.dot} animate-pulse-dot`} />
+          <span className={`size-1.5 rounded-full ${level.dot} ${lvl === 'normal' ? '' : 'animate-pulse-dot'}`} />
           {level.label.toUpperCase()}
         </span>
         <span className="text-zinc-500">

@@ -20,7 +20,7 @@ export function Sidebar({ active, collapsed, onSelect, onToggle }: SidebarProps)
 
   return (
     <aside
-      className={`relative z-20 flex shrink-0 flex-col border-r border-white/[0.06] bg-void/60 backdrop-blur-xl transition-[width] duration-300 ease-(--ease-snap) ${
+      className={`relative z-20 flex shrink-0 flex-col border-r border-white/[0.06] bg-void/85 transition-[width] duration-300 ease-(--ease-snap) ${
         collapsed ? 'w-[60px]' : 'w-[228px]'
       }`}
     >
@@ -35,7 +35,7 @@ export function Sidebar({ active, collapsed, onSelect, onToggle }: SidebarProps)
           style={{ height: ITEM_H - 4, transform: `translateY(${activeIndex * ITEM_H + 2}px)` }}
         >
           <span className="absolute inset-y-1.5 left-0 w-[2px] bg-volt shadow-[0_0_12px_2px_var(--color-volt)]" />
-          <span className="absolute inset-x-0 h-full bg-gradient-to-b from-transparent via-white/[0.04] to-transparent [animation:scan_2.8s_linear_infinite]" />
+          <span key={activeIndex} className="absolute inset-x-0 h-full bg-gradient-to-b from-transparent via-white/[0.07] to-transparent [animation:scan_0.9s_ease-out_both]" />
         </div>
 
         {NAV.map(({ id, label, code, icon: Icon, key }) => {
@@ -137,7 +137,8 @@ function SystemPulse() {
             <span className="text-zinc-200 tabular-nums">{pct(v as number)}</span>
           </div>
           <div className="mt-1 h-[2px] bg-white/[0.06]">
-            <div className={`h-full ${color} transition-[width] duration-700`} style={{ width: `${v}%` }} />
+            {/* scaleX instead of width: compositor-only, no layout or repaint on every tick. */}
+            <div className={`h-full origin-left ${color} transition-transform duration-300`} style={{ transform: `scaleX(${(v as number) / 100})` }} />
           </div>
         </div>
       ))}
