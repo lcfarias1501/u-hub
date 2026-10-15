@@ -34,7 +34,8 @@ import {
   Zap,
   type LucideIcon
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { Launcher, LauncherKind, Quest, QuestColumn, QuestTag } from '@shared/types'
 import { Field, Modal } from '@renderer/components/Modal'
 import { Panel } from '@renderer/components/Panel'
@@ -73,6 +74,9 @@ function QuestBoard() {
   const [quests, setQuests] = usePersistentState('quests', [])
   const [dragging, setDragging] = useState<Quest | null>(null)
   const [title, setTitle] = useState('')
+  const [hint, setHint] = useState(false)
+  const [fresh, setFresh] = useState<string | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   const [tag, setTag] = useState<QuestTag>('misc')
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
@@ -101,11 +105,28 @@ function QuestBoard() {
     setQuests((qs) => arrayMove(qs, qs.findIndex((q) => q.id === active.id), qs.findIndex((q) => q.id === over.id)))
   }
 
+  // Add stays clickable: with an empty title it points the user at the input instead of silently doing nothing.
   const add = (): void => {
-    if (!title.trim()) return
-    setQuests([...quests, { id: uid(), title: title.trim(), tag, column: 'backlog', createdAt: Date.now() }])
+    if (!title.trim()) {
+      setHint(true)
+      inputRef.current?.focus()
+      inputRef.current?.animate(
+        [{ transform: 'translateX(0)' }, { transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' }, { transform: 'translateX(0)' }],
+        { duration: 240, iterations: 2 }
+      )
+      return
+    }
+    const q: Quest = { id: uid(), title: title.trim(), tag, column: 'backlog', createdAt: Date.now() }
+    setQuests([q, ...quests]) // newest on top of Backlog, so it's visible even when the column scrolls
     setTitle('')
+    setFresh(q.id)
   }
+
+  useEffect(() => {
+    if (!fresh) return
+    const t = setTimeout(() => setFresh(null), 1600)
+    return () => clearTimeout(t)
+  }, [fresh])
 
   const toggleDone = (q: Quest): void =>
     setQuests(quests.map((x) => (x.id === q.id ? { ...x, column: x.column === 'done' ? 'backlog' : 'done' } : x)))
@@ -137,8 +158,15 @@ function QuestBoard() {
             )
           })}
         </div>
-        <input className="field h-8 flex-1" placeholder="Nova quest: build, código de console, afazer…  ↵" value={title} onChange={(e) => setTitle(e.target.value)} />
-        <button className="btn btn-volt" disabled={!title.trim()}>
+        <input
+          ref={inputRef}
+          className={`field h-8 flex-1 ${hint ? '!border-volt/70' : ''}`}
+          placeholder={hint ? 'Digite o nome da quest aqui e aperte Enter ou Add' : 'Nova quest: build, código de console, afazer…  ↵'}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onBlur={() => setHint(false)}
+        />
+        <button className={`btn btn-volt ${title.trim() ? '' : 'opacity-60'}`}>
           <Plus className="size-3.5" /> Add
         </button>
       </form>
@@ -146,18 +174,22 @@ function QuestBoard() {
       <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={() => setDragging(null)}>
         <div className="grid grid-cols-3 gap-3">
           {COLUMNS.map((col) => (
-            <QuestColumnView key={col.id} column={col} quests={quests.filter((q) => q.column === col.id)} onToggle={toggleDone} onRemove={remove} />
+            <QuestColumnView key={col.id} column={col} quests={quests.filter((q) => q.column === col.id)} onToggle={toggleDone} onRemove={remove} freshId={fresh} />
           ))}
         </div>
-        <DragOverlay dropAnimation={{ duration: 180, easing: 'cubic-bezier(0.2,0.9,0.25,1)' }}>
-          {dragging && <QuestCard quest={dragging} overlay />}
-        </DragOverlay>
+        {/* Portalled to <body> so no transformed ancestor can offset the overlay from the pointer. */}
+        {createPortal(
+          <DragOverlay dropAnimation={{ duration: 180, easing: 'cubic-bezier(0.2,0.9,0.25,1)' }}>
+            {dragging && <QuestCard quest={dragging} overlay />}
+          </DragOverlay>,
+          document.body
+        )}
       </DndContext>
     </Panel>
   )
 }
 
-function QuestColumnView({ column, quests, onToggle, onRemove }: { column: (typeof COLUMNS)[number]; quests: Quest[]; onToggle: (q: Quest) => void; onRemove: (q: Quest) => void }) {
+function QuestColumnView({ column, quests, onToggle, onRemove, freshId }: { column: (typeof COLUMNS)[number]; quests: Quest[]; onToggle: (q: Quest) => void; onRemove: (q: Quest) => void; freshId: string | null }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id })
   return (
     <div ref={setNodeRef} className={`flex min-h-[180px] flex-col rounded-[3px] border bg-black/20 transition-colors ${isOver ? 'border-volt/40' : 'border-white/[0.05]'}`}>
@@ -169,7 +201,7 @@ function QuestColumnView({ column, quests, onToggle, onRemove }: { column: (type
       <SortableContext items={quests.map((q) => q.id)} strategy={verticalListSortingStrategy}>
         <div className="flex max-h-[260px] flex-1 flex-col gap-1.5 overflow-y-auto p-1.5">
           {quests.map((q) => (
-            <SortableQuest key={q.id} quest={q} onToggle={() => onToggle(q)} onRemove={() => onRemove(q)} />
+            <SortableQuest key={q.id} quest={q} fresh={q.id === freshId} onToggle={() => onToggle(q)} onRemove={() => onRemove(q)} />
           ))}
         </div>
       </SortableContext>
@@ -177,10 +209,10 @@ function QuestColumnView({ column, quests, onToggle, onRemove }: { column: (type
   )
 }
 
-function SortableQuest({ quest, onToggle, onRemove }: { quest: Quest; onToggle: () => void; onRemove: () => void }) {
+function SortableQuest({ quest, fresh, onToggle, onRemove }: { quest: Quest; fresh: boolean; onToggle: () => void; onRemove: () => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: quest.id })
   return (
-    <div ref={setNodeRef} style={{ transform: CSS.Translate.toString(transform), transition }} {...attributes} {...listeners} className={isDragging ? 'opacity-30' : ''}>
+    <div ref={setNodeRef} style={{ transform: CSS.Translate.toString(transform), transition }} {...attributes} {...listeners} className={`${isDragging ? 'opacity-30' : ''} ${fresh ? 'animate-rise [&>div]:!border-acid/60 [&>div]:shadow-[0_0_18px_-6px_var(--color-acid)]' : ''}`}>
       <QuestCard quest={quest} onToggle={onToggle} onRemove={onRemove} />
     </div>
   )

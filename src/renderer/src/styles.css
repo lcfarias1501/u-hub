@@ -152,7 +152,9 @@
   to { opacity: 1; transform: none; }
 }
 .animate-rise {
-  animation: rise 360ms var(--ease-snap) both;
+  /* `backwards`, not `both`: a fill that keeps `transform` after the animation turns the element into
+     the containing block for position:fixed descendants, which shifted drag overlays and modals. */
+  animation: rise 360ms var(--ease-snap) backwards;
 }
 .animate-pulse-dot {
   animation: pulse-dot 1.6s ease-in-out infinite;
