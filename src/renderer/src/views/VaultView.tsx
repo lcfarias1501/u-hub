@@ -1,0 +1,274 @@
+import { Eye, EyeOff, Gamepad2, KeyRound, MessageCircle, Pencil, Pickaxe, Plus, Search, Server, ShieldCheck, Swords, Trash2, type LucideIcon } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import type { VaultCategory, VaultEntry } from '@shared/types'
+import { CopyButton } from '@renderer/components/CopyButton'
+import { Field, Modal } from '@renderer/components/Modal'
+import { MOD_LABEL, useModHotkeys } from '@renderer/hooks/useHotkeys'
+import { uid } from '@renderer/lib/format'
+import { PageHeader } from './PageHeader'
+
+const CATEGORIES: Record<VaultCategory, { label: string; icon: LucideIcon; tone: string }> = {
+  steam: { label: 'Steam', icon: Gamepad2, tone: 'text-sky-300 bg-sky-500/10 border-sky-400/25' },
+  discord: { label: 'Discord', icon: MessageCircle, tone: 'text-indigo-300 bg-indigo-500/10 border-indigo-400/25' },
+  minecraft: { label: 'Minecraft Server', icon: Pickaxe, tone: 'text-emerald-300 bg-emerald-500/10 border-emerald-400/25' },
+  battlenet: { label: 'Battle.net', icon: Swords, tone: 'text-blue-300 bg-blue-500/10 border-blue-400/25' },
+  other: { label: 'Outros', icon: KeyRound, tone: 'text-zinc-300 bg-white/5 border-white/15' }
+}
+
+const EMPTY: Omit<VaultEntry, 'id' | 'updatedAt'> = { category: 'steam', title: '', username: '', secret: '', host: '', notes: '' }
+
+export function VaultView() {
+  const [entries, setEntries] = useState<VaultEntry[]>([])
+  const [protection, setProtection] = useState<'keychain' | 'local-key' | null>(null)
+  const [query, setQuery] = useState('')
+  const [filter, setFilter] = useState<VaultCategory | 'all'>('all')
+  const [revealAll, setRevealAll] = useState(false)
+  const [editing, setEditing] = useState<VaultEntry | 'new' | null>(null)
+  const searchRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    void window.uhub.vault.read().then(({ entries, protection }) => {
+      setEntries(entries)
+      setProtection(protection)
+    })
+  }, [])
+
+  useModHotkeys({
+    k: () => searchRef.current?.focus(),
+    n: () => setEditing('new')
+  })
+
+  const persist = (next: VaultEntry[]): void => {
+    setEntries(next)
+    void window.uhub.vault.write(next)
+  }
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return entries
+      .filter((e) => filter === 'all' || e.category === filter)
+      .filter((e) => !q || [e.title, e.username, e.host, e.notes, CATEGORIES[e.category].label].some((f) => f.toLowerCase().includes(q)))
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+  }, [entries, query, filter])
+
+  const counts = useMemo(() => {
+    const c: Partial<Record<VaultCategory, number>> = {}
+    for (const e of entries) c[e.category] = (c[e.category] ?? 0) + 1
+    return c
+  }, [entries])
+
+  return (
+    <div className="animate-rise flex h-full flex-col p-6">
+      <PageHeader index="02" title="Vault & Game Keys" subtitle="Credenciais criptografadas localmente">
+        {protection && (
+          <span className="flex items-center gap-1.5 font-mono text-[10px] text-acid-soft" title={protection === 'keychain' ? 'Criptografado com o chaveiro do sistema (safeStorage)' : 'AES-256-GCM com chave local'}>
+            <ShieldCheck className="size-3.5" />
+            {protection === 'keychain' ? 'OS KEYCHAIN' : 'AES-256 LOCAL'}
+          </span>
+        )}
+        <button className="btn btn-volt" onClick={() => setEditing('new')}>
+          <Plus className="size-3.5" /> Nova credencial
+          <kbd className="kbd ml-1">{MOD_LABEL}N</kbd>
+        </button>
+      </PageHeader>
+
+      <div className="mb-4 flex items-center gap-2">
+        <div className="relative max-w-sm flex-1">
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-zinc-600" />
+          <input ref={searchRef} className="field pl-9" placeholder="Buscar por nome, user, IP…" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <kbd className="kbd absolute top-1/2 right-2 -translate-y-1/2">{MOD_LABEL}K</kbd>
+        </div>
+        <div className="flex gap-1">
+          <FilterChip active={filter === 'all'} onClick={() => setFilter('all')} label="Todos" count={entries.length} />
+          {(Object.keys(CATEGORIES) as VaultCategory[]).map((c) => (
+            <FilterChip key={c} active={filter === c} onClick={() => setFilter(c)} label={CATEGORIES[c].label} count={counts[c] ?? 0} />
+          ))}
+        </div>
+        <button className="btn ml-auto" onClick={() => setRevealAll((r) => !r)}>
+          {revealAll ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+          {revealAll ? 'Ocultar' : 'Mostrar'} todas
+        </button>
+      </div>
+
+      {visible.length === 0 ? (
+        <div className="panel grid flex-1 place-items-center">
+          <div className="text-center">
+            <KeyRound className="mx-auto mb-3 size-8 text-zinc-700" strokeWidth={1.25} />
+            <p className="font-mono text-[12px] text-zinc-500">{entries.length ? 'Nenhum resultado para o filtro.' : 'Vault vazio. Adicione sua primeira credencial.'}</p>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-3">
+          {visible.map((e) => (
+            <VaultCard key={e.id} entry={e} revealAll={revealAll} onEdit={() => setEditing(e)} onDelete={() => persist(entries.filter((x) => x.id !== e.id))} />
+          ))}
+        </div>
+      )}
+
+      {editing && (
+        <VaultEditor
+          initial={editing === 'new' ? null : editing}
+          onClose={() => setEditing(null)}
+          onSave={(entry) => {
+            const exists = entries.some((x) => x.id === entry.id)
+            persist(exists ? entries.map((x) => (x.id === entry.id ? entry : x)) : [entry, ...entries])
+            setEditing(null)
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function FilterChip({ active, label, count, onClick }: { active: boolean; label: string; count: number; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex h-8 items-center gap-1.5 rounded-[3px] border px-2.5 text-[12px] transition-all duration-150 ${
+        active ? 'border-volt/50 bg-volt/15 text-violet-100' : 'border-transparent text-zinc-500 hover:border-white/10 hover:text-zinc-200'
+      }`}
+    >
+      {label}
+      <span className={`font-mono text-[10px] ${active ? 'text-volt-soft' : 'text-zinc-600'}`}>{count}</span>
+    </button>
+  )
+}
+
+function VaultCard({ entry, revealAll, onEdit, onDelete }: { entry: VaultEntry; revealAll: boolean; onEdit: () => void; onDelete: () => void }) {
+  const [reveal, setReveal] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const cat = CATEGORIES[entry.category]
+  const shown = reveal || revealAll
+
+  useEffect(() => {
+    if (!confirmDelete) return
+    const t = setTimeout(() => setConfirmDelete(false), 2500)
+    return () => clearTimeout(t)
+  }, [confirmDelete])
+
+  return (
+    <article className="panel panel-hover group flex flex-col">
+      <header className="flex items-start gap-3 p-3 pb-2">
+        <span className={`grid size-8 shrink-0 place-items-center rounded-[3px] border ${cat.tone}`}>
+          <cat.icon className="size-4" strokeWidth={1.75} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-[14px] font-semibold text-zinc-100">{entry.title || 'Sem título'}</h3>
+          <div className="eyebrow">{cat.label}</div>
+        </div>
+        <div className="flex opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+          <button className="icon-btn" onClick={onEdit} aria-label="Editar">
+            <Pencil className="size-3.5" />
+          </button>
+          <button
+            className={`icon-btn ${confirmDelete ? '!bg-crit/20 !text-rose-300' : ''}`}
+            onClick={() => (confirmDelete ? onDelete() : setConfirmDelete(true))}
+            aria-label="Excluir"
+            title={confirmDelete ? 'Clique de novo para excluir' : 'Excluir'}
+          >
+            <Trash2 className="size-3.5" />
+          </button>
+        </div>
+      </header>
+
+      <dl className="mx-3 mb-3 divide-y divide-white/[0.04] rounded-[3px] border border-white/[0.05] bg-black/20 font-mono text-[12px]">
+        <Row label="USER" value={entry.username} />
+        <Row
+          label="KEY"
+          value={entry.secret}
+          display={shown ? entry.secret : entry.secret ? '•'.repeat(Math.min(entry.secret.length, 16)) : ''}
+          sensitive
+          extra={
+            <button className="icon-btn size-6" onClick={() => setReveal((r) => !r)} aria-label={shown ? 'Ocultar' : 'Mostrar'}>
+              {shown ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
+            </button>
+          }
+        />
+        {entry.host && <Row label="HOST" value={entry.host} icon={<Server className="size-3 text-zinc-600" />} />}
+      </dl>
+
+      {entry.notes && <p className="mx-3 mb-3 line-clamp-2 border-l border-volt/40 pl-2 text-[12px] text-zinc-500">{entry.notes}</p>}
+    </article>
+  )
+}
+
+function Row({ label, value, display, sensitive, extra, icon }: { label: string; value: string; display?: string; sensitive?: boolean; extra?: ReactNode; icon?: ReactNode }) {
+  return (
+    <div className="flex h-8 items-center gap-2 px-2">
+      <dt className="w-10 shrink-0 text-[9px] tracking-widest text-zinc-600">{label}</dt>
+      {icon}
+      <dd className="min-w-0 flex-1 truncate text-zinc-300 select-text">{(display ?? value) || <span className="text-zinc-700">—</span>}</dd>
+      {extra}
+      <CopyButton value={value} sensitive={sensitive} />
+    </div>
+  )
+}
+
+function VaultEditor({ initial, onClose, onSave }: { initial: VaultEntry | null; onClose: () => void; onSave: (e: VaultEntry) => void }) {
+  const [draft, setDraft] = useState(initial ?? { ...EMPTY, id: uid(), updatedAt: 0 })
+  const [showSecret, setShowSecret] = useState(false)
+  const set = <K extends keyof VaultEntry>(k: K, v: VaultEntry[K]): void => setDraft((d) => ({ ...d, [k]: v }))
+
+  return (
+    <Modal title={initial ? 'Editar credencial' : 'Nova credencial'} onClose={onClose}>
+      <form
+        className="grid grid-cols-2 gap-3"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (!draft.title.trim()) return
+          onSave({ ...draft, title: draft.title.trim(), updatedAt: Date.now() })
+        }}
+      >
+        <div className="col-span-2 flex flex-wrap gap-1">
+          {(Object.keys(CATEGORIES) as VaultCategory[]).map((c) => {
+            const C = CATEGORIES[c]
+            return (
+              <button
+                type="button"
+                key={c}
+                onClick={() => set('category', c)}
+                className={`flex h-8 items-center gap-1.5 rounded-[3px] border px-2.5 text-[12px] transition-all ${draft.category === c ? C.tone : 'border-white/[0.06] text-zinc-500 hover:text-zinc-200'}`}
+              >
+                <C.icon className="size-3.5" /> {C.label}
+              </button>
+            )
+          })}
+        </div>
+        <div className="col-span-2">
+          <Field label="Título / Servidor">
+            <input autoFocus className="field" value={draft.title} onChange={(e) => set('title', e.target.value)} placeholder="Ex: Conta principal Steam" />
+          </Field>
+        </div>
+        <Field label="Username / Tag">
+          <input className="field" value={draft.username} onChange={(e) => set('username', e.target.value)} placeholder="player#1234" />
+        </Field>
+        <Field label="Senha / Key">
+          <div className="relative">
+            <input className="field pr-9" type={showSecret ? 'text' : 'password'} value={draft.secret} onChange={(e) => set('secret', e.target.value)} />
+            <button type="button" className="icon-btn absolute top-1 right-1" onClick={() => setShowSecret((s) => !s)}>
+              {showSecret ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+            </button>
+          </div>
+        </Field>
+        <div className="col-span-2">
+          <Field label="IP / Porta">
+            <input className="field" value={draft.host} onChange={(e) => set('host', e.target.value)} placeholder="play.servidor.net:25565" />
+          </Field>
+        </div>
+        <div className="col-span-2">
+          <Field label="Notas rápidas">
+            <textarea className="field h-20 resize-none py-2" value={draft.notes} onChange={(e) => set('notes', e.target.value)} />
+          </Field>
+        </div>
+        <div className="col-span-2 flex justify-end gap-2 pt-1">
+          <button type="button" className="btn" onClick={onClose}>
+            Cancelar
+          </button>
+          <button type="submit" className="btn btn-volt" disabled={!draft.title.trim()}>
+            Salvar
+          </button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
