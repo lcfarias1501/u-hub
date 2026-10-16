@@ -3,6 +3,7 @@ import type {
   AppInfo,
   BackupSummary,
   LaunchResult,
+  LibrarySnapshot,
   ModuleId,
   RadioCommand,
   RadioState,
@@ -107,6 +108,18 @@ const api = {
     export: (password: string | null): Promise<{ ok: boolean; path?: string }> => ipcRenderer.invoke('backup:export', password),
     inspect: (): Promise<BackupSummary | null> => ipcRenderer.invoke('backup:inspect'),
     restore: (password: string | null): Promise<void> => ipcRenderer.invoke('backup:restore', password)
+  },
+  library: {
+    get: (): Promise<LibrarySnapshot> => ipcRenderer.invoke('library:get'),
+    scan: (): Promise<LibrarySnapshot> => ipcRenderer.invoke('library:scan'),
+    launch: (id: string): Promise<LaunchResult> => ipcRenderer.invoke('library:launch', id),
+    reveal: (id: string): Promise<void> => ipcRenderer.invoke('library:reveal', id),
+    pickExecutable: (): Promise<{ path: string; name: string } | null> => ipcRenderer.invoke('library:pickExecutable'),
+    onUpdate: (cb: (s: LibrarySnapshot) => void): (() => void) => {
+      const listener = (_: unknown, s: LibrarySnapshot): void => cb(s)
+      ipcRenderer.on('library:update', listener)
+      return () => ipcRenderer.off('library:update', listener)
+    }
   },
   launcher: {
     run: (id: string): Promise<LaunchResult> => ipcRenderer.invoke('launcher:run', id)

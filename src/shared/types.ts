@@ -81,7 +81,7 @@ export interface SpotifyPlaylist {
   uri: string
 }
 
-export type ModuleId = 'performance' | 'vault' | 'media' | 'quests'
+export type ModuleId = 'performance' | 'library' | 'vault' | 'media' | 'quests'
 export type ViewId = ModuleId | 'settings'
 
 /** App-wide accent (the "volt" colour). A subset of Accent that reads well as a primary. */
@@ -105,6 +105,7 @@ export interface AppSettings {
 export const DEFAULT_SETTINGS: AppSettings = {
   modules: [
     { id: 'performance', visible: true },
+    { id: 'library', visible: true },
     { id: 'vault', visible: true },
     { id: 'media', visible: true },
     { id: 'quests', visible: true }
@@ -117,6 +118,20 @@ export const DEFAULT_SETTINGS: AppSettings = {
   reduceMotion: false,
   sidebarMode: 'remember',
   zoom: 1
+}
+
+/**
+ * Stored settings merged over defaults. Modules added in newer versions are
+ * inserted at their default position so existing users see them.
+ */
+export function normalizeSettings(stored: Partial<AppSettings> | null | undefined): AppSettings {
+  const s = { ...DEFAULT_SETTINGS, ...stored }
+  const known = new Set(DEFAULT_SETTINGS.modules.map((m) => m.id))
+  const modules = (stored?.modules ?? []).filter((m) => known.has(m.id))
+  for (const [i, def] of DEFAULT_SETTINGS.modules.entries()) {
+    if (!modules.some((m) => m.id === def.id)) modules.splice(Math.min(i, modules.length), 0, { ...def })
+  }
+  return { ...s, modules }
 }
 
 export interface AppInfo {
@@ -145,6 +160,9 @@ export interface StoreSchema {
   launchers: Launcher[]
   vaultCategories: VaultCategoryDef[]
   settings: AppSettings
+  manualGames: ManualGame[]
+  hiddenGames: string[]
+  playtime: PlaytimeLog
   stations: RadioStation[]
   playlists: SpotifyPlaylist[]
   volume: number
@@ -237,3 +255,57 @@ export interface RadioState {
 }
 
 export type RadioCommand = { type: 'toggle' } | { type: 'next' } | { type: 'prev' } | { type: 'stop' } | { type: 'volume'; value: number }
+
+// ── Game library ─────────────────────────────────────────────────────────────
+
+export type GameSource = 'steam' | 'epic' | 'manual'
+
+export interface Game {
+  /** Stable id: `steam:<appid>`, `epic:<appName>` or `manual:<uuid>`. */
+  id: string
+  source: GameSource
+  name: string
+  /** Folder whose running processes count as "playing" (Steam/Epic install dir, or the .app bundle). */
+  installDir: string | null
+  /** Cover image URL, if known. */
+  cover: string | null
+  /** Hero/header image for the "now playing" banner. */
+  hero: string | null
+  /** Minutes reported by the source itself (Steam keeps its own total). */
+  sourceMinutes: number | null
+  sourceLastPlayed: number | null
+}
+
+/** User-added game, persisted in electron-store. */
+export interface ManualGame {
+  id: string
+  name: string
+  /** .app bundle, .exe or any executable; also used to detect it running. */
+  path: string
+  cover: string | null
+}
+
+/** Per-game time tracked by U-Hub (ms). Days are local dates `YYYY-MM-DD`. */
+export interface PlaytimeEntry {
+  totalMs: number
+  lastPlayed: number
+  sessions: number
+  days: Record<string, number>
+}
+
+export type PlaytimeLog = Record<string, PlaytimeEntry>
+
+export interface NowPlayingGame {
+  id: string
+  name: string
+  startedAt: number
+}
+
+export interface LibrarySnapshot {
+  games: Game[]
+  playtime: PlaytimeLog
+  nowPlaying: NowPlayingGame[]
+  scannedAt: number
+  /** Which launchers were found on this machine. */
+  sources: Record<Exclude<GameSource, 'manual'>, boolean>
+}

@@ -1,7 +1,8 @@
 import { join } from 'node:path'
-import { BrowserWindow, app, clipboard, ipcMain, session, shell } from 'electron'
+import { BrowserWindow, app, clipboard, dialog, ipcMain, session, shell } from 'electron'
 import type { AppInfo, SpotifyCommand, StoreSchema, VaultEntry } from '@shared/types'
 import { exportBackup, inspectBackup, restoreBackup } from './backup'
+import { launchGame, onLibraryChange, revealGame, scan as scanLibrary, snapshot as librarySnapshot, startLibrary, suggestName } from './games'
 import { registerPopoverIpc } from './popover'
 import { launch } from './launcher'
 import { applySettings, canOpenAtLogin, quitting, showWindow } from './shellIntegration'
@@ -169,6 +170,23 @@ function registerIpc(): void {
     }
   )
 
+  ipcMain.handle('library:get', () => librarySnapshot())
+  ipcMain.handle('library:scan', () => scanLibrary())
+  ipcMain.handle('library:launch', (_e, id: string) => launchGame(id))
+  ipcMain.handle('library:reveal', (_e, id: string) => revealGame(id))
+  ipcMain.handle('library:pickExecutable', async () => {
+    const mac = process.platform === 'darwin'
+    const opts: Electron.OpenDialogOptions = {
+      title: 'Escolha o jogo ou app',
+      defaultPath: mac ? '/Applications' : undefined,
+      // On macOS .app bundles are packages, so "openFile" lets the user pick them as a single item.
+      properties: ['openFile'],
+      filters: mac ? [{ name: 'Aplicativos', extensions: ['app'] }] : process.platform === 'win32' ? [{ name: 'Executáveis', extensions: ['exe', 'lnk', 'url'] }] : []
+    }
+    const { canceled, filePaths } = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+    return canceled || !filePaths[0] ? null : { path: filePaths[0], name: suggestName(filePaths[0]) }
+  })
+
   ipcMain.handle('launcher:run', (_e, id: string) => {
     const l = getValue('launchers').find((x) => x.id === id)
     return l ? launch(l) : { ok: false, error: 'Launcher não encontrado' }
@@ -180,6 +198,8 @@ app.whenReady().then(() => {
   registerIpc()
   createWindow()
   startUpdater(() => win)
+  startLibrary()
+  onLibraryChange((s) => win?.webContents.send('library:update', s))
   applySettings(getSettings(), () => win)
   onSettingsChange((s) => applySettings(s, () => win))
   app.on('activate', () => (win ? showWindow(win) : createWindow()))

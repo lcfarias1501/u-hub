@@ -3,7 +3,7 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import Store from 'electron-store'
-import { DEFAULT_SETTINGS, type AppSettings, type Launcher, type RadioStation, type StoreKey, type StoreSchema, type VaultEntry } from '@shared/types'
+import { DEFAULT_SETTINGS, normalizeSettings, type AppSettings, type Launcher, type RadioStation, type StoreKey, type StoreSchema, type VaultEntry } from '@shared/types'
 
 const DEFAULT_STATIONS: RadioStation[] = [
   { id: 'st-groove', name: 'Groove Salad', genre: 'Ambient / Downtempo', url: 'https://ice1.somafm.com/groovesalad-128-mp3' },
@@ -69,6 +69,9 @@ const store = new Store<StoreSchema & PrivateSchema>({
     playlists: [{ id: 'pl-lofi', name: 'lofi beats', uri: 'spotify:playlist:37i9dQZF1DWWQRwui0ExPn' }],
     volume: 0.6,
     settings: DEFAULT_SETTINGS,
+    manualGames: [],
+    hiddenGames: [],
+    playtime: {},
     vaultBlob: null,
     vaultMode: null,
     spotifyClientId: null,
@@ -77,7 +80,7 @@ const store = new Store<StoreSchema & PrivateSchema>({
 })
 
 const PUBLIC_KEYS = new Set<StoreKey>([
-  'sidebarCollapsed', 'lastView', 'perfLayout', 'quests', 'launchers', 'stations', 'playlists', 'volume', 'vaultCategories', 'settings'
+  'sidebarCollapsed', 'lastView', 'perfLayout', 'quests', 'launchers', 'stations', 'playlists', 'volume', 'vaultCategories', 'settings', 'manualGames', 'hiddenGames', 'playtime'
 ])
 
 /** Keys included in backups (everything user-authored except secrets and Spotify auth). */
@@ -94,6 +97,15 @@ export function getValue<K extends StoreKey>(key: K): StoreSchema[K] {
 export function setValue<K extends StoreKey>(key: K, value: StoreSchema[K]): void {
   store.set({ [key]: value } as Partial<StoreSchema>)
   if (key === 'settings') settingsListeners.forEach((l) => l(getSettings()))
+  valueListeners.get(key)?.forEach((l) => l())
+}
+
+const valueListeners = new Map<StoreKey, Set<() => void>>()
+
+/** Runs `l` whenever `key` is written (from main or from the renderer via store:set). */
+export function onValueChange(key: StoreKey, l: () => void): void {
+  if (!valueListeners.has(key)) valueListeners.set(key, new Set())
+  valueListeners.get(key)!.add(l)
 }
 
 // ── Settings ─────────────────────────────────────────────────────────────────
@@ -106,7 +118,7 @@ export function onSettingsChange(l: (s: AppSettings) => void): void {
 
 /** Stored settings merged over defaults, so keys added in newer versions always exist. */
 export function getSettings(): AppSettings {
-  return { ...DEFAULT_SETTINGS, ...store.get('settings') }
+  return normalizeSettings(store.get('settings'))
 }
 
 /** Wipes every stored value (settings, data, vault, Spotify session). */

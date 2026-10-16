@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, type ReactNode } from 'react'
-import { DEFAULT_SETTINGS, type AppSettings, type ModuleId } from '@shared/types'
+import { DEFAULT_SETTINGS, normalizeSettings, type AppSettings, type ModuleId } from '@shared/types'
 import { usePersistentState } from '@renderer/hooks/usePersistentState'
 import { THEME, applyTheme } from './theme'
 
@@ -18,8 +18,8 @@ const Ctx = createContext<SettingsCtx | null>(null)
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [stored, setStored, ready] = usePersistentState('settings', DEFAULT_SETTINGS)
   // Merge over defaults so settings added in later versions are always present.
-  const settings = useMemo(() => ({ ...DEFAULT_SETTINGS, ...stored }), [stored])
-  const update = useCallback((patch: Partial<AppSettings>) => setStored((s) => ({ ...DEFAULT_SETTINGS, ...s, ...patch })), [setStored])
+  const settings = useMemo(() => normalizeSettings(stored), [stored])
+  const update = useCallback((patch: Partial<AppSettings>) => setStored((s) => ({ ...normalizeSettings(s), ...patch })), [setStored])
 
   useEffect(() => {
     if (ready) applyTheme(settings.accent, settings.reduceMotion)

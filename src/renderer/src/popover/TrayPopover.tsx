@@ -1,7 +1,7 @@
 import { AppWindow, Laptop, Loader2, LogOut, Pause, Play, Radio, Settings, SkipBack, SkipForward, Volume1, Volume2, VolumeX } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { ModuleId, RadioState, SpotifyPlayback, SpotifyStatus } from '@shared/types'
-import { DEFAULT_SETTINGS } from '@shared/types'
+import { normalizeSettings } from '@shared/types'
 import { MODULES } from '@renderer/components/nav'
 import { useSpotifyVolume } from '@renderer/hooks/useSpotifyVolume'
 import { applyTheme } from '@renderer/lib/theme'
@@ -42,7 +42,7 @@ export default function TrayPopover() {
 
   // Pick the source that's actually playing each time the popover opens.
   const refresh = useCallback(async () => {
-    const settings = { ...DEFAULT_SETTINGS, ...(await window.uhub.store.get('settings')) }
+    const settings = normalizeSettings(await window.uhub.store.get('settings'))
     applyTheme(settings.accent, settings.reduceMotion)
     setModules(settings.modules.filter((m) => m.visible).map((m) => m.id))
     const [r, st] = await Promise.all([window.uhub.radio.get(), window.uhub.spotify.status()])

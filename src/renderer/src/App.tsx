@@ -8,6 +8,7 @@ import { usePersistentState } from './hooks/usePersistentState'
 import { SettingsProvider, useSettings } from './lib/settings'
 import { startRadioBridge } from './lib/radioBridge'
 import { startSystemFeed } from './lib/systemFeed'
+import { LibraryView } from './views/LibraryView'
 import { MediaView } from './views/MediaView'
 import { PerformanceView } from './views/PerformanceView'
 import { QuestView } from './views/QuestView'
@@ -80,6 +81,7 @@ function Shell() {
         <Sidebar items={items} active={view} collapsed={collapsed} onSelect={setView} onToggle={() => setCollapsed((c) => !c)} />
         <main className="relative min-w-0 flex-1 overflow-y-auto">
           {view === 'performance' && <PerformanceView />}
+          {view === 'library' && <LibraryView />}
           {view === 'vault' && <VaultView />}
           {view === 'quests' && <QuestView />}
           {view === 'settings' && <SettingsView />}

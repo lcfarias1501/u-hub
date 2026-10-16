@@ -1,4 +1,4 @@
-import { Activity, KeyRound, Music2, ScrollText, Settings, type LucideIcon } from 'lucide-react'
+import { Activity, KeyRound, LibraryBig, Music2, ScrollText, Settings, type LucideIcon } from 'lucide-react'
 import type { ModuleId, ViewId } from '@shared/types'
 
 export interface NavItem {
@@ -12,6 +12,7 @@ export interface NavItem {
 
 export const MODULES: Record<ModuleId, NavItem> = {
   performance: { id: 'performance', label: 'Performance', code: 'SYS', icon: Activity },
+  library: { id: 'library', label: 'Biblioteca', code: 'LIB', icon: LibraryBig },
   vault: { id: 'vault', label: 'Vault & Keys', code: 'VLT', icon: KeyRound },
   media: { id: 'media', label: 'Media & Audio', code: 'AUD', icon: Music2 },
   quests: { id: 'quests', label: 'Quest Log', code: 'QST', icon: ScrollText }
