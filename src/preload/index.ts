@@ -4,6 +4,9 @@ import type {
   BackupSummary,
   LaunchResult,
   LibrarySnapshot,
+  AppNotification,
+  RadarSnapshot,
+  SteamSearchResult,
   ModuleId,
   RadioCommand,
   RadioState,
@@ -34,7 +37,12 @@ const api = {
   store: {
     get: <K extends StoreKey>(key: K): Promise<StoreSchema[K]> => ipcRenderer.invoke('store:get', key),
     set: <K extends StoreKey>(key: K, value: StoreSchema[K]): Promise<void> =>
-      ipcRenderer.invoke('store:set', key, value)
+      ipcRenderer.invoke('store:set', key, value),
+    onChanged: (cb: (key: StoreKey) => void): (() => void) => {
+      const listener = (_: unknown, key: StoreKey): void => cb(key)
+      ipcRenderer.on('store:changed', listener)
+      return () => ipcRenderer.off('store:changed', listener)
+    }
   },
   vault: {
     read: (): Promise<{ entries: VaultEntry[]; protection: 'keychain' | 'local-key' }> =>
@@ -108,6 +116,23 @@ const api = {
     export: (password: string | null): Promise<{ ok: boolean; path?: string }> => ipcRenderer.invoke('backup:export', password),
     inspect: (): Promise<BackupSummary | null> => ipcRenderer.invoke('backup:inspect'),
     restore: (password: string | null): Promise<void> => ipcRenderer.invoke('backup:restore', password)
+  },
+  radar: {
+    get: (): Promise<RadarSnapshot> => ipcRenderer.invoke('radar:get'),
+    refresh: (): Promise<RadarSnapshot> => ipcRenderer.invoke('radar:refresh'),
+    search: (term: string): Promise<SteamSearchResult[]> => ipcRenderer.invoke('radar:search', term),
+    onUpdate: (cb: (s: RadarSnapshot) => void): (() => void) => {
+      const listener = (_: unknown, s: RadarSnapshot): void => cb(s)
+      ipcRenderer.on('radar:update', listener)
+      return () => ipcRenderer.off('radar:update', listener)
+    }
+  },
+  notifications: {
+    onNew: (cb: (n: AppNotification) => void): (() => void) => {
+      const listener = (_: unknown, n: AppNotification): void => cb(n)
+      ipcRenderer.on('notifications:new', listener)
+      return () => ipcRenderer.off('notifications:new', listener)
+    }
   },
   library: {
     get: (): Promise<LibrarySnapshot> => ipcRenderer.invoke('library:get'),

@@ -12,6 +12,7 @@ import { LibraryView } from './views/LibraryView'
 import { MediaView } from './views/MediaView'
 import { PerformanceView } from './views/PerformanceView'
 import { QuestView } from './views/QuestView'
+import { RadarView } from './views/RadarView'
 import { SettingsView } from './views/SettingsView'
 import { VaultView } from './views/VaultView'
 
@@ -82,6 +83,7 @@ function Shell() {
         <main className="relative min-w-0 flex-1 overflow-y-auto">
           {view === 'performance' && <PerformanceView />}
           {view === 'library' && <LibraryView />}
+          {view === 'radar' && <RadarView />}
           {view === 'vault' && <VaultView />}
           {view === 'quests' && <QuestView />}
           {view === 'settings' && <SettingsView />}

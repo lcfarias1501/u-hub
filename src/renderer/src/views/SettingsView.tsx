@@ -28,6 +28,19 @@ import { useSettings } from '@renderer/lib/settings'
 import { THEME } from '@renderer/lib/theme'
 import { PageHeader } from './PageHeader'
 
+const REGIONS: Record<string, string> = {
+  BR: 'Brasil',
+  PT: 'Portugal',
+  US: 'Estados Unidos',
+  GB: 'Reino Unido',
+  ES: 'Espanha',
+  FR: 'França',
+  DE: 'Alemanha',
+  AR: 'Argentina',
+  MX: 'México',
+  CA: 'Canadá'
+}
+
 const SECTIONS = [
   { id: 'modules', label: 'Módulos', icon: LayoutGrid },
   { id: 'general', label: 'Geral', icon: SlidersHorizontal },
@@ -193,6 +206,16 @@ function GeneralSection({ info }: { info: AppInfo | null }) {
         description={`Fechar a janela deixa o U-Hub rodando com um ícone ${mac ? 'na barra de menus' : 'na bandeja'}. Para sair de vez, use “Sair” no menu do ícone${mac ? ' ou ⌘Q' : ''}.`}
       >
         <Switch checked={settings.closeToTray} onChange={(closeToTray) => update({ closeToTray })} label="Fechar para a bandeja" />
+      </SettingRow>
+      <SettingRow title="Região das lojas" description="Define a moeda e os preços em Ofertas & Notícias (Steam e Epic).">
+        <select className="field h-8 w-48 cursor-pointer" value={settings.storeCountry} onChange={(e) => update({ storeCountry: e.target.value })}>
+          <option value="auto">Automático{info ? ` (${REGIONS[info.localeCountry] ?? info.localeCountry})` : ''}</option>
+          {Object.entries(REGIONS).map(([code, label]) => (
+            <option key={code} value={code}>
+              {label}
+            </option>
+          ))}
+        </select>
       </SettingRow>
       <SettingRow title="Aba inicial" description="Qual módulo abre quando o U-Hub inicia.">
         <select

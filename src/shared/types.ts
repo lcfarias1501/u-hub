@@ -81,7 +81,7 @@ export interface SpotifyPlaylist {
   uri: string
 }
 
-export type ModuleId = 'performance' | 'library' | 'vault' | 'media' | 'quests'
+export type ModuleId = 'performance' | 'library' | 'radar' | 'vault' | 'media' | 'quests'
 export type ViewId = ModuleId | 'settings'
 
 /** App-wide accent (the "volt" colour). A subset of Accent that reads well as a primary. */
@@ -95,6 +95,8 @@ export interface AppSettings {
   startMinimized: boolean
   startView: ModuleId | 'last'
   closeToTray: boolean
+  /** Store region for prices (Steam/Epic). 'auto' follows the OS region. */
+  storeCountry: 'auto' | string
   // Appearance
   accent: ThemeAccent
   reduceMotion: boolean
@@ -106,6 +108,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   modules: [
     { id: 'performance', visible: true },
     { id: 'library', visible: true },
+    { id: 'radar', visible: true },
     { id: 'vault', visible: true },
     { id: 'media', visible: true },
     { id: 'quests', visible: true }
@@ -114,6 +117,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   startMinimized: false,
   startView: 'last',
   closeToTray: false,
+  storeCountry: 'auto',
   accent: 'violet',
   reduceMotion: false,
   sidebarMode: 'remember',
@@ -141,6 +145,8 @@ export interface AppInfo {
   userDataPath: string
   /** setLoginItemSettings only works for packaged apps on macOS/Windows. */
   canOpenAtLogin: boolean
+  /** OS region (ISO country), used when the store region is 'auto'. */
+  localeCountry: string
 }
 
 export interface BackupSummary {
@@ -163,6 +169,9 @@ export interface StoreSchema {
   manualGames: ManualGame[]
   hiddenGames: string[]
   playtime: PlaytimeLog
+  wishlist: WishlistItem[]
+  newsSources: NewsSource[]
+  notifications: AppNotification[]
   stations: RadioStation[]
   playlists: SpotifyPlaylist[]
   volume: number
@@ -308,4 +317,101 @@ export interface LibrarySnapshot {
   scannedAt: number
   /** Which launchers were found on this machine. */
   sources: Record<Exclude<GameSource, 'manual'>, boolean>
+}
+
+// ── Deals & news ("Radar") ───────────────────────────────────────────────────
+
+export interface FreeGame {
+  id: string
+  title: string
+  image: string | null
+  url: string
+  /** Original price as the store formats it (e.g. "R$ 52,99"). */
+  originalPrice: string | null
+  startsAt: number
+  endsAt: number
+  /** Free right now, or announced as the next freebie. */
+  status: 'now' | 'upcoming'
+}
+
+/** Prices are in the smallest currency unit (cents), as Steam returns them. */
+export interface Deal {
+  appid: number
+  name: string
+  image: string
+  discount: number
+  initial: number
+  final: number
+  currency: string
+  endsAt: number | null
+}
+
+export interface WishlistItem {
+  appid: number
+  name: string
+  image: string
+  addedAt: number
+  /** Alert when the price is at or below this (cents). Null = alert on any discount. */
+  target: number | null
+  currency: string | null
+  final: number | null
+  initial: number | null
+  discount: number
+  lowest: number | null
+  checkedAt: number | null
+}
+
+export interface SteamSearchResult {
+  appid: number
+  name: string
+  image: string
+  final: number | null
+  currency: string | null
+}
+
+export interface NewsSource {
+  id: string
+  name: string
+  url: string
+  enabled: boolean
+}
+
+export interface NewsItem {
+  id: string
+  title: string
+  url: string
+  date: number
+  summary: string
+  image: string | null
+  /** Feed name for RSS; game name for Steam news. */
+  source: string
+  kind: 'rss' | 'steam'
+  appid?: number
+  patch: boolean
+}
+
+export interface RadarSnapshot {
+  free: FreeGame[]
+  deals: Deal[]
+  news: NewsItem[]
+  updatedAt: number | null
+  refreshing: boolean
+  errors: string[]
+}
+
+// ── Notifications ────────────────────────────────────────────────────────────
+
+export type NotificationKind = 'free' | 'price' | 'patch' | 'game' | 'system'
+
+export interface AppNotification {
+  id: string
+  kind: NotificationKind
+  title: string
+  body: string
+  createdAt: number
+  read: boolean
+  url?: string
+  image?: string | null
+  /** View to open when clicked inside the app. */
+  view?: ViewId
 }

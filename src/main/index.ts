@@ -3,11 +3,13 @@ import { BrowserWindow, app, clipboard, dialog, ipcMain, session, shell } from '
 import type { AppInfo, SpotifyCommand, StoreSchema, VaultEntry } from '@shared/types'
 import { exportBackup, inspectBackup, restoreBackup } from './backup'
 import { launchGame, onLibraryChange, revealGame, scan as scanLibrary, snapshot as librarySnapshot, startLibrary, suggestName } from './games'
+import { initNotifications } from './notifications'
 import { registerPopoverIpc } from './popover'
+import { radarSnapshot, refreshRadar, searchSteam, startRadar } from './radar'
 import { launch } from './launcher'
 import { applySettings, canOpenAtLogin, quitting, showWindow } from './shellIntegration'
 import * as spotify from './spotify'
-import { getSettings, getValue, isPublicKey, onSettingsChange, readVault, resetStore, setValue, vaultProtection, writeVault } from './storage'
+import { getSettings, getValue, isPublicKey, onAnyValueChange, onSettingsChange, readVault, resetStore, setValue, vaultProtection, writeVault } from './storage'
 import { readStatic, startMonitor } from './system'
 import { applyUpdate, checkNow, startUpdater, updaterStatus } from './updater'
 
@@ -145,7 +147,8 @@ function registerIpc(): void {
       platform: process.platform,
       isPackaged: app.isPackaged,
       userDataPath: app.getPath('userData'),
-      canOpenAtLogin: canOpenAtLogin()
+      canOpenAtLogin: canOpenAtLogin(),
+      localeCountry: app.getLocaleCountryCode() || 'BR'
     })
   )
   ipcMain.handle('app:openDataFolder', () => shell.openPath(app.getPath('userData')))
@@ -187,6 +190,10 @@ function registerIpc(): void {
     return canceled || !filePaths[0] ? null : { path: filePaths[0], name: suggestName(filePaths[0]) }
   })
 
+  ipcMain.handle('radar:get', () => radarSnapshot())
+  ipcMain.handle('radar:refresh', () => refreshRadar())
+  ipcMain.handle('radar:search', (_e, term: string) => searchSteam(String(term)))
+
   ipcMain.handle('launcher:run', (_e, id: string) => {
     const l = getValue('launchers').find((x) => x.id === id)
     return l ? launch(l) : { ok: false, error: 'Launcher não encontrado' }
@@ -198,7 +205,11 @@ app.whenReady().then(() => {
   registerIpc()
   createWindow()
   startUpdater(() => win)
+  // Keep every window's copy of stored values fresh when main (or another window) writes them.
+  onAnyValueChange((key) => BrowserWindow.getAllWindows().forEach((w) => w.webContents.send('store:changed', key)))
+  initNotifications(() => win)
   startLibrary()
+  startRadar(() => win)
   onLibraryChange((s) => win?.webContents.send('library:update', s))
   applySettings(getSettings(), () => win)
   onSettingsChange((s) => applySettings(s, () => win))

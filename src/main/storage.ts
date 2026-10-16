@@ -3,7 +3,7 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import Store from 'electron-store'
-import { DEFAULT_SETTINGS, normalizeSettings, type AppSettings, type Launcher, type RadioStation, type StoreKey, type StoreSchema, type VaultEntry } from '@shared/types'
+import { DEFAULT_SETTINGS, normalizeSettings, type AppSettings, type RadarSnapshot, type Launcher, type RadioStation, type StoreKey, type StoreSchema, type VaultEntry } from '@shared/types'
 
 const DEFAULT_STATIONS: RadioStation[] = [
   { id: 'st-groove', name: 'Groove Salad', genre: 'Ambient / Downtempo', url: 'https://ice1.somafm.com/groovesalad-128-mp3' },
@@ -39,6 +39,10 @@ interface Sealed {
 }
 
 interface PrivateSchema {
+  /** Last radar fetch, so the module opens instantly (and offline). */
+  radarCache: Omit<RadarSnapshot, 'refreshing' | 'errors'> | null
+  /** Ids already announced, so each freebie/patch notifies once. */
+  radarSeen: { free: string[]; news: string[] }
   vaultBlob: string | null
   vaultMode: 'safe' | 'aes' | null
   spotifyClientId: string | null
@@ -72,6 +76,15 @@ const store = new Store<StoreSchema & PrivateSchema>({
     manualGames: [],
     hiddenGames: [],
     playtime: {},
+    wishlist: [],
+    newsSources: [
+      { id: 'ign-br', name: 'IGN Brasil', url: 'https://br.ign.com/feed.xml', enabled: true },
+      { id: 'adrenaline', name: 'Adrenaline', url: 'https://www.adrenaline.com.br/feed/', enabled: true },
+      { id: 'pcgamer', name: 'PC Gamer', url: 'https://www.pcgamer.com/rss/', enabled: false }
+    ],
+    notifications: [],
+    radarCache: null,
+    radarSeen: { free: [], news: [] },
     vaultBlob: null,
     vaultMode: null,
     spotifyClientId: null,
@@ -80,7 +93,7 @@ const store = new Store<StoreSchema & PrivateSchema>({
 })
 
 const PUBLIC_KEYS = new Set<StoreKey>([
-  'sidebarCollapsed', 'lastView', 'perfLayout', 'quests', 'launchers', 'stations', 'playlists', 'volume', 'vaultCategories', 'settings', 'manualGames', 'hiddenGames', 'playtime'
+  'sidebarCollapsed', 'lastView', 'perfLayout', 'quests', 'launchers', 'stations', 'playlists', 'volume', 'vaultCategories', 'settings', 'manualGames', 'hiddenGames', 'playtime', 'wishlist', 'newsSources', 'notifications'
 ])
 
 /** Keys included in backups (everything user-authored except secrets and Spotify auth). */
@@ -98,6 +111,14 @@ export function setValue<K extends StoreKey>(key: K, value: StoreSchema[K]): voi
   store.set({ [key]: value } as Partial<StoreSchema>)
   if (key === 'settings') settingsListeners.forEach((l) => l(getSettings()))
   valueListeners.get(key)?.forEach((l) => l())
+  anyListeners.forEach((l) => l(key))
+}
+
+const anyListeners = new Set<(key: StoreKey) => void>()
+
+/** Runs on every public store write; used to tell open windows that a value changed. */
+export function onAnyValueChange(l: (key: StoreKey) => void): void {
+  anyListeners.add(l)
 }
 
 const valueListeners = new Map<StoreKey, Set<() => void>>()
@@ -117,6 +138,11 @@ export function onSettingsChange(l: (s: AppSettings) => void): void {
 }
 
 /** Stored settings merged over defaults, so keys added in newer versions always exist. */
+type PrivateKey = keyof PrivateSchema
+
+export const getPrivate = <K extends PrivateKey>(key: K): PrivateSchema[K] => store.get(key)
+export const setPrivate = <K extends PrivateKey>(key: K, value: PrivateSchema[K]): void => store.set({ [key]: value } as Partial<PrivateSchema>)
+
 export function getSettings(): AppSettings {
   return normalizeSettings(store.get('settings'))
 }

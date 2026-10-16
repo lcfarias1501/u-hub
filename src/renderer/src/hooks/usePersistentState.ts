@@ -16,14 +16,22 @@ export function usePersistentState<K extends StoreKey>(
 
   useEffect(() => {
     let alive = true
-    void window.uhub.store.get(key).then((v) => {
-      if (!alive) return
-      ref.current = v
-      setValue(v)
-      setReady(true)
+    const load = (): void =>
+      void window.uhub.store.get(key).then((v) => {
+        if (!alive) return
+        ref.current = v
+        setValue(v)
+        setReady(true)
+      })
+    load()
+    // Values can also change outside this component (main process, other windows).
+    // While a local write is still pending, ours is newer — skip the refetch.
+    const off = window.uhub.store.onChanged((changed) => {
+      if (changed === key && timer.current === undefined) load()
     })
     return () => {
       alive = false
+      off()
     }
   }, [key])
 
@@ -34,7 +42,10 @@ export function usePersistentState<K extends StoreKey>(
       ref.current = next
       setValue(next)
       window.clearTimeout(timer.current)
-      timer.current = window.setTimeout(() => void window.uhub.store.set(key, ref.current), 250)
+      timer.current = window.setTimeout(() => {
+        timer.current = undefined
+        void window.uhub.store.set(key, ref.current)
+      }, 250)
     },
     [key]
   )

@@ -8,6 +8,7 @@ import trayTemplate2x from '../../resources/trayTemplate@2x.png?asset'
 const MODULE_LABELS: Record<ModuleId, string> = {
   performance: 'Performance',
   library: 'Biblioteca',
+  radar: 'Ofertas & Notícias',
   vault: 'Vault & Keys',
   media: 'Media & Audio',
   quests: 'Quest Log'
