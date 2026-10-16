@@ -29,6 +29,7 @@ import {
 } from '@shared/types'
 import { CopyButton } from '@renderer/components/CopyButton'
 import { Panel } from '@renderer/components/Panel'
+import { useSpotifyVolume } from '@renderer/hooks/useSpotifyVolume'
 
 const POLL_MS = 3000
 const DEVICE_POLL_MS = 15000
@@ -221,10 +222,8 @@ function Controller({ status, onLogout, onExpired }: { status: SpotifyStatus; on
   const [playlists, setPlaylists] = useState<SpotifyPlaylistItem[]>([])
   const [error, setError] = useState<string | null>(null)
   const [now, setNow] = useState(Date.now())
-  const [volume, setVolume] = useState<number | null>(null)
   const [showDevices, setShowDevices] = useState(false)
   const [movingHere, setMovingHere] = useState(false)
-  const volumeTimer = useRef<number | undefined>(undefined)
   const rootRef = useRef<HTMLDivElement>(null)
   // The Media tab stays mounted in the background; `offsetParent` is null while any ancestor is hidden.
   const onScreen = (): boolean => document.visibilityState === 'visible' && rootRef.current?.offsetParent != null
@@ -290,7 +289,9 @@ function Controller({ status, onLogout, onExpired }: { status: SpotifyStatus; on
   const fallbackDevice = devices.find((d) => d.isActive) ?? devices[0]
   const progress = pb ? Math.min(pb.durationMs, pb.progressMs + (pb.isPlaying ? now - pb.fetchedAt : 0)) : 0
   const pctDone = pb?.durationMs ? (progress / pb.durationMs) * 100 : 0
-  const vol = volume ?? pb?.device?.volume ?? 50
+  const [vol, changeVolume] = useSpotifyVolume(pb?.device?.volume, (percent) => {
+    void window.uhub.spotify.command({ type: 'volume', percent }).then((res) => (res.ok ? setError(null) : handle(res)))
+  })
   const premium = status.user?.product === 'premium'
   const RepeatIcon = pb?.repeat === 'track' ? Repeat1 : Repeat
   const nextRepeat = { off: 'context', context: 'track', track: 'off' } as const
@@ -398,15 +399,7 @@ function Controller({ status, onLogout, onExpired }: { status: SpotifyStatus; on
           max={100}
           value={vol}
           disabled={!pb?.device || pb.device.volume == null}
-          onChange={(e) => {
-            const v = Number(e.target.value)
-            setVolume(v)
-            window.clearTimeout(volumeTimer.current)
-            volumeTimer.current = window.setTimeout(() => {
-              void send({ type: 'volume', percent: v })
-              setVolume(null)
-            }, 250)
-          }}
+          onChange={(e) => changeVolume(Number(e.target.value))}
           className="h-1 flex-1 cursor-pointer appearance-none disabled:opacity-30"
           style={{ background: `linear-gradient(90deg, var(--color-acid) ${vol}%, rgba(255,255,255,0.08) ${vol}%)` }}
         />

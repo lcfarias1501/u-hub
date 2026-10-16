@@ -1,20 +1,24 @@
 import { join } from 'node:path'
-import { BrowserWindow, ipcMain, screen, shell, type Rectangle } from 'electron'
-import type { RadioCommand, RadioState } from '@shared/types'
+import { BrowserWindow, app, ipcMain, screen, shell, type Rectangle } from 'electron'
+import type { ModuleId, RadioCommand, RadioState, ViewId } from '@shared/types'
 
 const WIDTH = 340
-const HEIGHT = 214
 const GAP = 6
+const MIN_HEIGHT = 120
+const MAX_HEIGHT = 640
 
 let popover: BrowserWindow | null = null
 let hiddenAt = 0
+let anchor: Rectangle | null = null
+/** The page reports its content height; the window follows it. */
+let height = 420
 let radio: RadioState = { station: null, playing: false, loading: false, error: null, volume: 0.6 }
 
 function create(): BrowserWindow {
   const isMac = process.platform === 'darwin'
   const win = new BrowserWindow({
     width: WIDTH,
-    height: HEIGHT,
+    height,
     show: false,
     frame: false,
     resizable: false,
@@ -53,6 +57,7 @@ function create(): BrowserWindow {
 }
 
 function position(win: BrowserWindow, anchor: Rectangle): void {
+  const HEIGHT = height
   const display = screen.getDisplayMatching(anchor)
   const area = display.workArea
   let x = Math.round(anchor.x + anchor.width / 2 - WIDTH / 2)
@@ -60,7 +65,7 @@ function position(win: BrowserWindow, anchor: Rectangle): void {
   let y = anchor.y < area.y + area.height / 2 ? anchor.y + anchor.height + GAP : anchor.y - HEIGHT - GAP
   x = Math.min(Math.max(x, area.x + GAP), area.x + area.width - WIDTH - GAP)
   y = Math.min(Math.max(y, area.y + GAP), area.y + area.height - HEIGHT - GAP)
-  win.setPosition(x, y, false)
+  win.setBounds({ x, y, width: WIDTH, height: HEIGHT }, false)
 }
 
 export function hide(): void {
@@ -71,13 +76,14 @@ export function hide(): void {
 }
 
 /** Toggles the popover under the tray icon. */
-export function toggle(anchor: Rectangle): void {
+export function toggle(at: Rectangle): void {
   // Clicking the tray icon blurs (and hides) an open popover just before this
   // click arrives; without this guard the click would immediately reopen it.
   if (Date.now() - hiddenAt < 250) return
   if (popover?.isVisible()) return hide()
+  anchor = at
   popover ??= create()
-  position(popover, anchor)
+  position(popover, at)
   popover.show()
   popover.focus()
   popover.webContents.send('popover:shown')
@@ -92,7 +98,7 @@ export function destroy(): void {
  * The radio's <audio> lives in the main window. It publishes its state here;
  * the popover reads it and sends commands back through main.
  */
-export function registerPopoverIpc(getMain: () => BrowserWindow | null, showMain: () => void): void {
+export function registerPopoverIpc(getMain: () => BrowserWindow | null, showMain: (view?: ViewId) => void): void {
   ipcMain.on('radio:publish', (_e, state: RadioState) => {
     radio = state
     popover?.webContents.send('radio:state', state)
@@ -100,8 +106,15 @@ export function registerPopoverIpc(getMain: () => BrowserWindow | null, showMain
   ipcMain.handle('radio:get', () => radio)
   ipcMain.on('radio:command', (_e, cmd: RadioCommand) => getMain()?.webContents.send('radio:command', cmd))
   ipcMain.on('popover:hide', () => hide())
-  ipcMain.on('app:showMain', () => {
+  ipcMain.on('app:showMain', (_e, view?: ModuleId | 'settings') => {
     hide()
-    showMain()
+    showMain(view)
+  })
+  ipcMain.on('app:quit', () => app.quit())
+  ipcMain.on('popover:resize', (_e, h: number) => {
+    const next = Math.round(Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, h)))
+    if (next === height) return
+    height = next
+    if (popover && anchor) position(popover, anchor)
   })
 }

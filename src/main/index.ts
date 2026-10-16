@@ -163,7 +163,10 @@ function registerIpc(): void {
 
   registerPopoverIpc(
     () => win,
-    () => showWindow(win)
+    (view) => {
+      showWindow(win)
+      if (view) win?.webContents.send('nav:go', view)
+    }
   )
 
   ipcMain.handle('launcher:run', (_e, id: string) => {

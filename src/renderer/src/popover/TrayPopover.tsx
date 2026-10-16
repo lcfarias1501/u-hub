@@ -1,7 +1,9 @@
-import { ExternalLink, Laptop, Loader2, Pause, Play, Radio, SkipBack, SkipForward, Volume1, Volume2, VolumeX } from 'lucide-react'
+import { AppWindow, Laptop, Loader2, LogOut, Pause, Play, Radio, Settings, SkipBack, SkipForward, Volume1, Volume2, VolumeX } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import type { RadioState, SpotifyPlayback, SpotifyStatus } from '@shared/types'
+import type { ModuleId, RadioState, SpotifyPlayback, SpotifyStatus } from '@shared/types'
 import { DEFAULT_SETTINGS } from '@shared/types'
+import { MODULES } from '@renderer/components/nav'
+import { useSpotifyVolume } from '@renderer/hooks/useSpotifyVolume'
 import { applyTheme } from '@renderer/lib/theme'
 
 type Source = 'radio' | 'spotify'
@@ -19,7 +21,18 @@ export default function TrayPopover() {
   const [source, setSource] = useState<Source>('radio')
   const [error, setError] = useState<string | null>(null)
   const [now, setNow] = useState(Date.now())
+  const [modules, setModules] = useState<ModuleId[]>([])
   const picked = useRef(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  // The window is sized to the page: report height changes (tab switch, Spotify tab appearing…).
+  useEffect(() => {
+    const el = rootRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => window.uhub.popover.resize(el.offsetHeight))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   const loadPlayback = useCallback(async () => {
     const res = await window.uhub.spotify.playback()
@@ -31,6 +44,7 @@ export default function TrayPopover() {
   const refresh = useCallback(async () => {
     const settings = { ...DEFAULT_SETTINGS, ...(await window.uhub.store.get('settings')) }
     applyTheme(settings.accent, settings.reduceMotion)
+    setModules(settings.modules.filter((m) => m.visible).map((m) => m.id))
     const [r, st] = await Promise.all([window.uhub.radio.get(), window.uhub.spotify.status()])
     setRadio(r)
     setSpotify(st)
@@ -67,7 +81,7 @@ export default function TrayPopover() {
   }
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden rounded-[12px] border border-white/10 bg-base/80 text-zinc-300 select-none">
+    <div ref={rootRef} className="flex flex-col overflow-hidden rounded-[12px] border border-white/10 bg-base/80 text-zinc-300 select-none">
       <header className="flex h-9 shrink-0 items-center gap-1 border-b border-white/[0.06] px-2.5">
         <Tab active={source === 'radio'} onClick={() => choose('radio')} live={radio?.playing}>
           RÁDIO
@@ -77,9 +91,7 @@ export default function TrayPopover() {
             SPOTIFY
           </Tab>
         )}
-        <button className="icon-btn ml-auto size-6" onClick={() => window.uhub.popover.showMain()} title="Abrir U-Hub">
-          <ExternalLink className="size-3.5" />
-        </button>
+        <span className="eyebrow ml-auto pr-1 text-[9px] text-zinc-600">TOCANDO AGORA</span>
       </header>
 
       {source === 'radio' ? (
@@ -87,7 +99,32 @@ export default function TrayPopover() {
       ) : (
         <SpotifyNowPlaying pb={pb} now={now} error={error} setError={setError} reload={loadPlayback} setPb={setPb} />
       )}
+
+      {/* The same entries as the right-click menu, so one click reaches everything. */}
+      <nav className="border-t border-white/[0.06] p-1.5">
+        <MenuItem icon={<AppWindow />} label="Abrir U-Hub" onClick={() => window.uhub.popover.showMain()} />
+        <div className="my-1 h-px bg-white/[0.06]" />
+        {modules.map((id) => {
+          const M = MODULES[id]
+          return <MenuItem key={id} icon={<M.icon />} label={M.label} onClick={() => window.uhub.popover.showMain(id)} />
+        })}
+        <MenuItem icon={<Settings />} label="Configurações" onClick={() => window.uhub.popover.showMain('settings')} />
+        <div className="my-1 h-px bg-white/[0.06]" />
+        <MenuItem icon={<LogOut />} label="Sair do U-Hub" onClick={() => window.uhub.popover.quit()} />
+      </nav>
     </div>
+  )
+}
+
+function MenuItem({ icon, label, onClick }: { icon: ReactNode; label: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex h-7 w-full items-center gap-2.5 rounded-[5px] px-2 text-left text-[13px] text-zinc-300 transition-colors duration-100 hover:bg-volt/25 hover:text-white [&_svg]:size-3.5 [&_svg]:text-zinc-500 hover:[&_svg]:text-white"
+    >
+      {icon}
+      {label}
+    </button>
   )
 }
 
@@ -107,7 +144,7 @@ function Tab({ active, live, onClick, children }: { active: boolean; live?: bool
 
 function Layout({ art, title, subtitle, meta, controls, volume }: { art: ReactNode; title: string; subtitle: string; meta: ReactNode; controls: ReactNode; volume: ReactNode }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col justify-between p-3">
+    <div className="flex h-[176px] flex-col justify-between p-3">
       <div className="flex gap-3">
         <div className="size-[84px] shrink-0 overflow-hidden rounded-[6px] bg-white/[0.04] shadow-[0_10px_24px_-10px_rgba(0,0,0,0.9)]">{art}</div>
         <div className="flex min-w-0 flex-1 flex-col">
@@ -237,9 +274,10 @@ function SpotifyNowPlaying({
   reload: () => Promise<SpotifyPlayback | null>
   setPb: (p: SpotifyPlayback | null) => void
 }) {
-  const [volume, setVolume] = useState<number | null>(null)
   const [movingHere, setMovingHere] = useState(false)
-  const volumeTimer = useRef<number | undefined>(undefined)
+  const [volPercent, changeVolume] = useSpotifyVolume(pb?.device?.volume, (percent) => {
+    void window.uhub.spotify.command({ type: 'volume', percent }).then((res) => setError(res.ok ? null : (REASONS[res.reason ?? ''] ?? res.error)))
+  })
   const progress = pb ? Math.min(pb.durationMs, pb.progressMs + (pb.isPlaying ? now - pb.fetchedAt : 0)) : 0
   const pct = pb?.durationMs ? (progress / pb.durationMs) * 100 : 0
 
@@ -252,7 +290,7 @@ function SpotifyNowPlaying({
 
   if (!pb?.track) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 p-4 text-center">
+      <div className="flex h-[176px] flex-col items-center justify-center gap-3 p-4 text-center">
         <p className="text-[12px] text-zinc-500">Nada tocando no Spotify agora.</p>
         <button
           className="btn !border-acid/40 !text-emerald-200"
@@ -272,7 +310,6 @@ function SpotifyNowPlaying({
     )
   }
 
-  const vol = volume ?? (pb.device?.volume ?? 50) / 100
   return (
     <Layout
       art={pb.track.image ? <img src={pb.track.image} alt="" className="size-full object-cover" /> : null}
@@ -310,18 +347,7 @@ function SpotifyNowPlaying({
         />
       }
       volume={
-        <VolumeSlider
-          value={vol}
-          disabled={pb.device?.volume == null}
-          onChange={(v) => {
-            setVolume(v)
-            window.clearTimeout(volumeTimer.current)
-            volumeTimer.current = window.setTimeout(() => {
-              void send({ type: 'volume', percent: v * 100 })
-              setVolume(null)
-            }, 250)
-          }}
-        />
+        <VolumeSlider value={volPercent / 100} disabled={pb.device?.volume == null} onChange={(v) => changeVolume(v * 100)} />
       }
     />
   )

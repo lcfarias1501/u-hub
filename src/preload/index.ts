@@ -69,8 +69,8 @@ const api = {
     openDataFolder: (): Promise<string> => ipcRenderer.invoke('app:openDataFolder'),
     reset: (): Promise<void> => ipcRenderer.invoke('app:reset'),
     /** Navigation requested from outside the page (tray menu). */
-    onNavigate: (cb: (view: ModuleId) => void): (() => void) => {
-      const listener = (_: unknown, v: ModuleId): void => cb(v)
+    onNavigate: (cb: (view: ModuleId | 'settings') => void): (() => void) => {
+      const listener = (_: unknown, v: ModuleId | 'settings'): void => cb(v)
       ipcRenderer.on('nav:go', listener)
       return () => ipcRenderer.off('nav:go', listener)
     }
@@ -93,7 +93,10 @@ const api = {
   },
   popover: {
     hide: (): void => ipcRenderer.send('popover:hide'),
-    showMain: (): void => ipcRenderer.send('app:showMain'),
+    showMain: (view?: ModuleId | 'settings'): void => ipcRenderer.send('app:showMain', view),
+    quit: (): void => ipcRenderer.send('app:quit'),
+    /** Reports the page's content height so the window can fit it. */
+    resize: (height: number): void => ipcRenderer.send('popover:resize', height),
     onShown: (cb: () => void): (() => void) => {
       const listener = (): void => cb()
       ipcRenderer.on('popover:shown', listener)

@@ -61,7 +61,7 @@ function Shell() {
   }, [view, modules])
 
   // Tray menu navigation
-  useEffect(() => window.uhub.app.onNavigate((v) => modules.includes(v) && setView(v)))
+  useEffect(() => window.uhub.app.onNavigate((v) => (v === 'settings' || modules.includes(v)) && setView(v)))
 
   const items = useMemo(() => navItems(modules), [modules])
 
