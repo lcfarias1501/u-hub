@@ -1,6 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
+  AppInfo,
+  BackupSummary,
   LaunchResult,
+  ModuleId,
   SpotifyCommand,
   SpotifyDevice,
   SpotifyPlayback,
@@ -52,11 +55,28 @@ const api = {
   updater: {
     status: (): Promise<UpdateStatus> => ipcRenderer.invoke('updater:status'),
     apply: (): Promise<void> => ipcRenderer.invoke('updater:apply'),
+    check: (): Promise<'dev' | 'latest' | 'available' | 'error'> => ipcRenderer.invoke('updater:check'),
     onStatus: (cb: (s: UpdateStatus) => void): (() => void) => {
       const listener = (_: unknown, s: UpdateStatus): void => cb(s)
       ipcRenderer.on('updater:status', listener)
       return () => ipcRenderer.off('updater:status', listener)
     }
+  },
+  app: {
+    info: (): Promise<AppInfo> => ipcRenderer.invoke('app:info'),
+    openDataFolder: (): Promise<string> => ipcRenderer.invoke('app:openDataFolder'),
+    reset: (): Promise<void> => ipcRenderer.invoke('app:reset'),
+    /** Navigation requested from outside the page (tray menu). */
+    onNavigate: (cb: (view: ModuleId) => void): (() => void) => {
+      const listener = (_: unknown, v: ModuleId): void => cb(v)
+      ipcRenderer.on('nav:go', listener)
+      return () => ipcRenderer.off('nav:go', listener)
+    }
+  },
+  backup: {
+    export: (password: string | null): Promise<{ ok: boolean; path?: string }> => ipcRenderer.invoke('backup:export', password),
+    inspect: (): Promise<BackupSummary | null> => ipcRenderer.invoke('backup:inspect'),
+    restore: (password: string | null): Promise<void> => ipcRenderer.invoke('backup:restore', password)
   },
   launcher: {
     run: (id: string): Promise<LaunchResult> => ipcRenderer.invoke('launcher:run', id)

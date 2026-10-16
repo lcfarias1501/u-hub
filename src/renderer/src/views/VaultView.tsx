@@ -153,7 +153,7 @@ function FilterChip({ active, label, count, onClick, category }: { active: boole
     <button
       onClick={onClick}
       className={`flex h-8 shrink-0 items-center gap-1.5 rounded-[3px] border px-2.5 text-[12px] whitespace-nowrap transition-all duration-150 ${
-        active ? 'border-volt/50 bg-volt/15 text-violet-100' : 'border-transparent text-zinc-500 hover:border-white/10 hover:text-zinc-200'
+        active ? 'border-volt/50 bg-volt/15 text-volt-100' : 'border-transparent text-zinc-500 hover:border-white/10 hover:text-zinc-200'
       }`}
     >
       {Icon && <Icon className={`size-3.5 ${active ? '' : ACCENTS[category!.accent].tone.split(' ')[0]}`} />}
@@ -285,7 +285,7 @@ function VaultEditor({
               <button
                 type="button"
                 onClick={() => setCreatingCategory(true)}
-                className="flex h-8 items-center gap-1 rounded-[3px] border border-dashed border-white/15 px-2.5 text-[12px] text-zinc-500 transition-colors hover:border-volt/50 hover:text-violet-200"
+                className="flex h-8 items-center gap-1 rounded-[3px] border border-dashed border-white/15 px-2.5 text-[12px] text-zinc-500 transition-colors hover:border-volt/50 hover:text-volt-200"
               >
                 <Plus className="size-3.5" /> Nova
               </button>

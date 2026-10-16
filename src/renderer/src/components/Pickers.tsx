@@ -12,7 +12,7 @@ export function IconPicker({ value, onChange }: { value: string; onChange: (key:
           onClick={() => onChange(name)}
           title={name}
           className={`grid size-8 place-items-center rounded-[3px] border transition-all duration-150 ${
-            value === name ? 'border-volt/60 bg-volt/15 text-violet-200' : 'border-white/[0.06] text-zinc-500 hover:-translate-y-px hover:text-zinc-200'
+            value === name ? 'border-volt/60 bg-volt/15 text-volt-200' : 'border-white/[0.06] text-zinc-500 hover:-translate-y-px hover:text-zinc-200'
           }`}
         >
           <I className="size-4" />

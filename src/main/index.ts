@@ -1,11 +1,13 @@
 import { join } from 'node:path'
 import { BrowserWindow, app, clipboard, ipcMain, session, shell } from 'electron'
-import type { SpotifyCommand, StoreSchema, VaultEntry } from '@shared/types'
+import type { AppInfo, SpotifyCommand, StoreSchema, VaultEntry } from '@shared/types'
+import { exportBackup, inspectBackup, restoreBackup } from './backup'
 import { launch } from './launcher'
+import { applySettings, canOpenAtLogin, quitting, showWindow } from './shellIntegration'
 import * as spotify from './spotify'
-import { getValue, isPublicKey, readVault, setValue, vaultProtection, writeVault } from './storage'
+import { getSettings, getValue, isPublicKey, onSettingsChange, readVault, resetStore, setValue, vaultProtection, writeVault } from './storage'
 import { readStatic, startMonitor } from './system'
-import { applyUpdate, startUpdater, updaterStatus } from './updater'
+import { applyUpdate, checkNow, startUpdater, updaterStatus } from './updater'
 
 let win: BrowserWindow | null = null
 let stopMonitor: (() => void) | null = null
@@ -30,7 +32,24 @@ function createWindow(): void {
     }
   })
 
-  win.once('ready-to-show', () => win?.show())
+  win.once('ready-to-show', () => {
+    const { startMinimized, closeToTray } = getSettings()
+    if (!startMinimized) win?.show()
+    else if (!closeToTray) {
+      // No tray to come back from, so start as a minimized window instead of an invisible one.
+      win?.showInactive()
+      win?.minimize()
+    }
+  })
+  win.webContents.on('did-finish-load', () => win?.webContents.setZoomFactor(getSettings().zoom))
+
+  // "Close to tray": the close button hides the window; quitting goes through the tray menu or ⌘Q.
+  win.on('close', (e) => {
+    if (getSettings().closeToTray && !quitting) {
+      e.preventDefault()
+      win?.hide()
+    }
+  })
 
   // Never navigate the app window away; open external links in the OS browser.
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -115,6 +134,31 @@ function registerIpc(): void {
 
   ipcMain.handle('updater:status', () => updaterStatus())
   ipcMain.handle('updater:apply', () => applyUpdate())
+  ipcMain.handle('updater:check', () => checkNow())
+
+  ipcMain.handle(
+    'app:info',
+    (): AppInfo => ({
+      version: app.getVersion(),
+      platform: process.platform,
+      isPackaged: app.isPackaged,
+      userDataPath: app.getPath('userData'),
+      canOpenAtLogin: canOpenAtLogin()
+    })
+  )
+  ipcMain.handle('app:openDataFolder', () => shell.openPath(app.getPath('userData')))
+  ipcMain.handle('app:reset', () => {
+    resetStore()
+    app.relaunch()
+    app.exit(0)
+  })
+
+  ipcMain.handle('backup:export', (_e, password: string | null) => exportBackup(win, password || null))
+  ipcMain.handle('backup:inspect', () => inspectBackup(win))
+  ipcMain.handle('backup:restore', (_e, password: string | null) => {
+    restoreBackup(password || null)
+    applySettings(getSettings(), () => win)
+  })
 
   ipcMain.handle('launcher:run', (_e, id: string) => {
     const l = getValue('launchers').find((x) => x.id === id)
@@ -127,7 +171,9 @@ app.whenReady().then(() => {
   registerIpc()
   createWindow()
   startUpdater(() => win)
-  app.on('activate', () => BrowserWindow.getAllWindows().length === 0 && createWindow())
+  applySettings(getSettings(), () => win)
+  onSettingsChange((s) => applySettings(s, () => win))
+  app.on('activate', () => (win ? showWindow(win) : createWindow()))
 })
 
 app.on('window-all-closed', () => {

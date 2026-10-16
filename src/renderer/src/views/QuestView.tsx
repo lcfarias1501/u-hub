@@ -206,7 +206,7 @@ function QuestCard({ quest, overlay, onToggle, onRemove }: { quest: Quest; overl
   return (
     <div
       className={`group flex cursor-grab items-start gap-2 rounded-[3px] border bg-raised/80 p-2 transition-all duration-150 active:cursor-grabbing ${
-        overlay ? 'rotate-[1.5deg] border-volt/50 shadow-[0_16px_40px_-12px_rgba(139,92,246,0.5)]' : 'border-white/[0.06] hover:border-white/15'
+        overlay ? 'rotate-[1.5deg] border-volt/50 shadow-[0_16px_40px_-12px_color-mix(in_srgb,var(--color-volt)_50%,transparent)]' : 'border-white/[0.06] hover:border-white/15'
       }`}
     >
       <button
@@ -367,7 +367,7 @@ function LauncherEditor({ initial, onClose, onSave, onDelete }: { initial: Launc
           <Field label="Tipo">
             <div className="flex h-9 rounded-[3px] border border-white/[0.08] p-0.5">
               {(Object.keys(KIND_LABEL) as LauncherKind[]).map((k) => (
-                <button type="button" key={k} onClick={() => set('kind', k)} className={`rounded-[2px] px-3 font-mono text-[10px] transition-colors ${d.kind === k ? 'bg-volt/25 text-violet-100' : 'text-zinc-500 hover:text-zinc-200'}`}>
+                <button type="button" key={k} onClick={() => set('kind', k)} className={`rounded-[2px] px-3 font-mono text-[10px] transition-colors ${d.kind === k ? 'bg-volt/25 text-volt-100' : 'text-zinc-500 hover:text-zinc-200'}`}>
                   {KIND_LABEL[k]}
                 </button>
               ))}

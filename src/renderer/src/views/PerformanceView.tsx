@@ -27,9 +27,10 @@ import { Panel } from '@renderer/components/Panel'
 import { usePersistentState } from '@renderer/hooks/usePersistentState'
 import { bytes, kbps, pct, rate } from '@renderer/lib/format'
 import { HISTORY_SECONDS, LEVEL_META, systemLevel, useSystemFeed } from '@renderer/lib/systemFeed'
+import { useSettings } from '@renderer/lib/settings'
+import { withAlpha } from '@renderer/lib/theme'
 import { PageHeader } from './PageHeader'
 
-const VOLT = '#8B5CF6'
 const ACID = '#10B981'
 
 type WidgetId = 'cpu' | 'cores' | 'memory' | 'network' | 'power'
@@ -174,6 +175,7 @@ interface WidgetProps {
 }
 
 function CpuWidget({ handle, history, latest }: WidgetProps) {
+  const { volt: VOLT } = useSettings()
   const data = padded(
     history.map((s) => ({ cpu: s.cpu.total })),
     { cpu: null as number | null }
@@ -199,7 +201,7 @@ function CpuWidget({ handle, history, latest }: WidgetProps) {
             </defs>
             {grid}
             <YAxis domain={[0, 100]} ticks={[0, 50, 100]} tick={{ fill: '#52525b', fontSize: 10, fontFamily: 'var(--font-mono)' }} axisLine={false} tickLine={false} />
-            <Tooltip content={<ChartTip unit="%" />} cursor={{ stroke: 'rgba(167,139,250,0.3)' }} />
+            <Tooltip content={<ChartTip unit="%" />} cursor={{ stroke: withAlpha(VOLT, 0.3) }} />
             <Area name="CPU" type="monotone" dataKey="cpu" stroke={VOLT} strokeWidth={1.5} fill="url(#cpuFill)" isAnimationActive={false} connectNulls={false} />
           </AreaChart>
         </ResponsiveContainer>
@@ -210,6 +212,7 @@ function CpuWidget({ handle, history, latest }: WidgetProps) {
 
 /** Heatmap: one row per core, one column per second. Cheaper and denser than N separate line charts. */
 function CoresWidget({ handle, history }: Omit<WidgetProps, 'latest'>) {
+  const { volt: VOLT } = useSettings()
   const cores = history.at(-1)?.cpu.cores ?? []
   const cols = HISTORY_SECONDS
   const offset = cols - history.length
@@ -235,7 +238,7 @@ function CoresWidget({ handle, history }: Omit<WidgetProps, 'latest'>) {
         {cores.map((load, i) => (
           <div key={i} className="flex items-center justify-between leading-none">
             <span className="text-zinc-600">{String(i).padStart(2, '0')}</span>
-            <span className={load > 85 ? 'text-rose-300' : load > 50 ? 'text-violet-200' : 'text-zinc-400'}>{load.toFixed(0)}</span>
+            <span className={load > 85 ? 'text-rose-300' : load > 50 ? 'text-volt-200' : 'text-zinc-400'}>{load.toFixed(0)}</span>
           </div>
         ))}
       </div>
@@ -273,6 +276,7 @@ function MemoryWidget({ handle, history, latest }: WidgetProps) {
 }
 
 function NetworkWidget({ handle, history, latest }: WidgetProps) {
+  const { volt: VOLT } = useSettings()
   const data = padded(
     history.map((s) => ({ down: kbps(s.net.rxSec), up: kbps(s.net.txSec) })),
     { down: null as number | null, up: null as number | null }
@@ -316,6 +320,7 @@ function Gauge({ value, color }: { value: number; color: string }) {
 }
 
 function PowerWidget({ handle, latest }: Omit<WidgetProps, 'history'>) {
+  const { volt: VOLT } = useSettings()
   const level = systemLevel(latest)
   const meta = LEVEL_META[level]
   const bat = latest?.battery

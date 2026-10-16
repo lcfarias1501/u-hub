@@ -81,7 +81,60 @@ export interface SpotifyPlaylist {
   uri: string
 }
 
-export type ViewId = 'performance' | 'vault' | 'media' | 'quests'
+export type ModuleId = 'performance' | 'vault' | 'media' | 'quests'
+export type ViewId = ModuleId | 'settings'
+
+/** App-wide accent (the "volt" colour). A subset of Accent that reads well as a primary. */
+export type ThemeAccent = 'violet' | 'indigo' | 'sky' | 'emerald' | 'amber' | 'rose'
+
+export interface AppSettings {
+  /** Sidebar order and visibility. At least one module stays visible. */
+  modules: { id: ModuleId; visible: boolean }[]
+  // General
+  openAtLogin: boolean
+  startMinimized: boolean
+  startView: ModuleId | 'last'
+  closeToTray: boolean
+  // Appearance
+  accent: ThemeAccent
+  reduceMotion: boolean
+  sidebarMode: 'remember' | 'expanded' | 'collapsed'
+  zoom: number
+}
+
+export const DEFAULT_SETTINGS: AppSettings = {
+  modules: [
+    { id: 'performance', visible: true },
+    { id: 'vault', visible: true },
+    { id: 'media', visible: true },
+    { id: 'quests', visible: true }
+  ],
+  openAtLogin: false,
+  startMinimized: false,
+  startView: 'last',
+  closeToTray: false,
+  accent: 'violet',
+  reduceMotion: false,
+  sidebarMode: 'remember',
+  zoom: 1
+}
+
+export interface AppInfo {
+  version: string
+  platform: string
+  isPackaged: boolean
+  userDataPath: string
+  /** setLoginItemSettings only works for packaged apps on macOS/Windows. */
+  canOpenAtLogin: boolean
+}
+
+export interface BackupSummary {
+  path: string
+  createdAt: string
+  appVersion: string
+  hasVault: boolean
+  counts: { quests: number; launchers: number; categories: number; stations: number }
+}
 
 /** Plain (non-secret) keys persisted through electron-store. The vault lives in its own encrypted blob. */
 export interface StoreSchema {
@@ -91,6 +144,7 @@ export interface StoreSchema {
   quests: Quest[]
   launchers: Launcher[]
   vaultCategories: VaultCategoryDef[]
+  settings: AppSettings
   stations: RadioStation[]
   playlists: SpotifyPlaylist[]
   volume: number

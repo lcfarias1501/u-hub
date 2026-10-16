@@ -3,7 +3,9 @@ import type { ViewId } from '@shared/types'
 import { isMac } from '@renderer/hooks/useHotkeys'
 import { LEVEL_META, systemLevel, useSystemFeed } from '@renderer/lib/systemFeed'
 import logo from '@renderer/assets/logo.png'
-import { NAV } from './nav'
+import { Settings } from 'lucide-react'
+import { MOD_LABEL } from '@renderer/hooks/useHotkeys'
+import { navItemFor } from './nav'
 import { UpdateBadge } from './UpdateBadge'
 
 function Clock() {
@@ -15,11 +17,11 @@ function Clock() {
   return <span className="tabular-nums">{now.toLocaleTimeString('pt-BR', { hour12: false })}</span>
 }
 
-export function TopBar({ view }: { view: ViewId }) {
+export function TopBar({ view, onOpenSettings }: { view: ViewId; onOpenSettings: () => void }) {
   const { latest } = useSystemFeed()
   const lvl = systemLevel(latest)
   const level = LEVEL_META[lvl]
-  const item = NAV.find((n) => n.id === view)!
+  const item = navItemFor(view)
 
   return (
     <header
@@ -28,7 +30,7 @@ export function TopBar({ view }: { view: ViewId }) {
       }`}
     >
       <div className="flex items-center gap-2">
-        <img src={logo} alt="" className="size-5 drop-shadow-[0_0_6px_rgba(139,92,246,0.45)]" draggable={false} />
+        <img src={logo} alt="" className="size-5 drop-shadow-[0_0_6px_color-mix(in_srgb,var(--color-volt)_45%,transparent)]" draggable={false} />
         <span className="font-mono text-[12px] font-semibold tracking-[0.25em] text-zinc-100">U-HUB</span>
       </div>
 
@@ -49,6 +51,16 @@ export function TopBar({ view }: { view: ViewId }) {
         <span className="text-zinc-500">
           <Clock />
         </span>
+        <button
+          onClick={onOpenSettings}
+          title={`Configurações (${MOD_LABEL},)`}
+          aria-label="Configurações"
+          className={`group grid size-7 place-items-center rounded-[3px] border transition-all duration-200 ${
+            view === 'settings' ? 'border-volt/50 bg-volt/15 text-volt-200' : 'border-transparent text-zinc-500 hover:border-white/10 hover:text-zinc-100'
+          }`}
+        >
+          <Settings className="size-4 transition-transform duration-500 group-hover:rotate-90" />
+        </button>
       </div>
     </header>
   )

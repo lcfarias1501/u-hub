@@ -5,6 +5,7 @@ import { Panel } from '@renderer/components/Panel'
 import { usePersistentState } from '@renderer/hooks/usePersistentState'
 import { audioEngine, useAudio } from '@renderer/lib/audioEngine'
 import { uid } from '@renderer/lib/format'
+import { withAlpha } from '@renderer/lib/theme'
 import { PageHeader } from './PageHeader'
 import { SpotifyPanel } from './SpotifyPanel'
 
@@ -70,7 +71,7 @@ function RadioDeck() {
             step={0.01}
             value={volume}
             onChange={(e) => setVolume(Number(e.target.value))}
-            className="h-1 flex-1 cursor-pointer appearance-none rounded-none bg-white/10 accent-violet-500"
+            className="h-1 flex-1 cursor-pointer appearance-none rounded-none bg-white/10 accent-volt"
             style={{ background: `linear-gradient(90deg, var(--color-volt) ${volume * 100}%, rgba(255,255,255,0.08) ${volume * 100}%)` }}
           />
           <span className="w-9 text-right font-mono text-[11px] text-zinc-400 tabular-nums">{Math.round(volume * 100)}</span>
@@ -193,7 +194,9 @@ function Visualizer({ active }: { active: boolean }) {
       }
       const bw = w / bars
       const grad = ctx.createLinearGradient(0, 0, w, 0)
-      grad.addColorStop(0, 'rgba(139,92,246,0.55)')
+      // Read the live accent so the visualizer follows Settings → Aparência.
+      const volt = getComputedStyle(document.documentElement).getPropertyValue('--color-volt').trim() || '#8b5cf6'
+      grad.addColorStop(0, withAlpha(volt, 0.55))
       grad.addColorStop(1, 'rgba(16,185,129,0.45)')
       ctx.fillStyle = grad
       for (let i = 0; i < bars; i++) {

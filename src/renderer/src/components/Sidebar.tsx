@@ -4,19 +4,21 @@ import { MOD_LABEL } from '@renderer/hooks/useHotkeys'
 import { audioEngine, useAudio } from '@renderer/lib/audioEngine'
 import { pct } from '@renderer/lib/format'
 import { useSystemFeed } from '@renderer/lib/systemFeed'
-import { NAV } from './nav'
+import type { NavItem } from './nav'
 
 const ITEM_H = 44
 
 interface SidebarProps {
+  items: NavItem[]
   active: ViewId
   collapsed: boolean
   onSelect: (id: ViewId) => void
   onToggle: () => void
 }
 
-export function Sidebar({ active, collapsed, onSelect, onToggle }: SidebarProps) {
-  const activeIndex = NAV.findIndex((n) => n.id === active)
+export function Sidebar({ items, active, collapsed, onSelect, onToggle }: SidebarProps) {
+  // -1 while Settings is open: the indicator fades out instead of pointing at a module.
+  const activeIndex = items.findIndex((n) => n.id === active)
 
   return (
     <aside
@@ -32,13 +34,13 @@ export function Sidebar({ active, collapsed, onSelect, onToggle }: SidebarProps)
         {/* Sliding active indicator: one element that moves, instead of one per item. */}
         <div
           className="pointer-events-none absolute inset-x-2 top-0 overflow-hidden rounded-[3px] border border-volt/25 bg-gradient-to-r from-volt/20 via-volt/[0.06] to-transparent transition-transform duration-300 ease-(--ease-snap)"
-          style={{ height: ITEM_H - 4, transform: `translateY(${activeIndex * ITEM_H + 2}px)` }}
+          style={{ height: ITEM_H - 4, transform: `translateY(${Math.max(0, activeIndex) * ITEM_H + 2}px)`, opacity: activeIndex < 0 ? 0 : 1 }}
         >
           <span className="absolute inset-y-1.5 left-0 w-[2px] bg-volt shadow-[0_0_12px_2px_var(--color-volt)]" />
           <span key={activeIndex} className="absolute inset-x-0 h-full bg-gradient-to-b from-transparent via-white/[0.07] to-transparent [animation:scan_0.9s_ease-out_both]" />
         </div>
 
-        {NAV.map(({ id, label, code, icon: Icon, key }) => {
+        {items.map(({ id, label, code, icon: Icon, key }) => {
           const isActive = id === active
           return (
             <button
@@ -58,10 +60,12 @@ export function Sidebar({ active, collapsed, onSelect, onToggle }: SidebarProps)
                   <span className="truncate text-[13px] font-medium">{label}</span>
                   <span className="ml-auto flex items-center gap-1">
                     <span className="font-mono text-[9px] text-zinc-600 transition-opacity group-hover:opacity-0">{code}</span>
-                    <span className="absolute right-3 flex gap-0.5 opacity-0 transition-all duration-200 group-hover:opacity-100">
-                      <kbd className="kbd">{MOD_LABEL}</kbd>
-                      <kbd className="kbd">{key}</kbd>
-                    </span>
+                    {key && (
+                      <span className="absolute right-3 flex gap-0.5 opacity-0 transition-all duration-200 group-hover:opacity-100">
+                        <kbd className="kbd">{MOD_LABEL}</kbd>
+                        <kbd className="kbd">{key}</kbd>
+                      </span>
+                    )}
                   </span>
                 </>
               )}
@@ -69,8 +73,12 @@ export function Sidebar({ active, collapsed, onSelect, onToggle }: SidebarProps)
               {collapsed && (
                 <span className="pointer-events-none absolute left-full z-50 ml-3 flex -translate-x-1 items-center gap-2 rounded-[3px] border border-white/10 bg-raised/95 px-2.5 py-1.5 whitespace-nowrap opacity-0 shadow-xl backdrop-blur transition-all duration-150 group-hover:translate-x-0 group-hover:opacity-100">
                   <span className="text-[12px] text-zinc-200">{label}</span>
-                  <kbd className="kbd">{MOD_LABEL}</kbd>
-                  <kbd className="kbd -ml-1.5">{key}</kbd>
+                  {key && (
+                    <>
+                      <kbd className="kbd">{MOD_LABEL}</kbd>
+                      <kbd className="kbd -ml-1.5">{key}</kbd>
+                    </>
+                  )}
                 </span>
               )}
             </button>

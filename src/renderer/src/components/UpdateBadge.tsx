@@ -25,7 +25,7 @@ export function UpdateBadge() {
     <button
       onClick={() => void window.uhub.updater.apply()}
       title={ready ? 'Reinicia o U-Hub com a nova versão' : 'Abre a página de download da nova versão'}
-      className="animate-rise flex items-center gap-1.5 rounded-[3px] border border-volt/40 bg-volt/15 px-2 py-0.5 font-mono text-[10px] text-violet-100 transition-all hover:bg-volt/25 hover:shadow-[0_0_18px_-4px_var(--color-volt)]"
+      className="animate-rise flex items-center gap-1.5 rounded-[3px] border border-volt/40 bg-volt/15 px-2 py-0.5 font-mono text-[10px] text-volt-100 transition-all hover:bg-volt/25 hover:shadow-[0_0_18px_-4px_var(--color-volt)]"
     >
       {ready ? <RotateCw className="size-3" /> : <ArrowDownToLine className="size-3" />}
       v{s.version} {ready ? '· reiniciar' : '· baixar'}

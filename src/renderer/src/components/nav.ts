@@ -1,17 +1,26 @@
-import { Activity, KeyRound, Music2, ScrollText, type LucideIcon } from 'lucide-react'
-import type { ViewId } from '@shared/types'
+import { Activity, KeyRound, Music2, ScrollText, Settings, type LucideIcon } from 'lucide-react'
+import type { ModuleId, ViewId } from '@shared/types'
 
 export interface NavItem {
   id: ViewId
   label: string
   code: string
   icon: LucideIcon
-  key: string
+  /** Shortcut digit; assigned from the module's position in the sidebar. */
+  key?: string
 }
 
-export const NAV: NavItem[] = [
-  { id: 'performance', label: 'Performance', code: 'SYS', icon: Activity, key: '1' },
-  { id: 'vault', label: 'Vault & Keys', code: 'VLT', icon: KeyRound, key: '2' },
-  { id: 'media', label: 'Media & Audio', code: 'AUD', icon: Music2, key: '3' },
-  { id: 'quests', label: 'Quest Log', code: 'QST', icon: ScrollText, key: '4' }
-]
+export const MODULES: Record<ModuleId, NavItem> = {
+  performance: { id: 'performance', label: 'Performance', code: 'SYS', icon: Activity },
+  vault: { id: 'vault', label: 'Vault & Keys', code: 'VLT', icon: KeyRound },
+  media: { id: 'media', label: 'Media & Audio', code: 'AUD', icon: Music2 },
+  quests: { id: 'quests', label: 'Quest Log', code: 'QST', icon: ScrollText }
+}
+
+export const SETTINGS_ITEM: NavItem = { id: 'settings', label: 'Configurações', code: 'CFG', icon: Settings, key: ',' }
+
+/** Visible modules in sidebar order, with ⌘1…⌘9 following that order. */
+export const navItems = (modules: ModuleId[]): NavItem[] =>
+  modules.map((id, i) => ({ ...MODULES[id], key: i < 9 ? String(i + 1) : undefined }))
+
+export const navItemFor = (view: ViewId): NavItem => (view === 'settings' ? SETTINGS_ITEM : MODULES[view])

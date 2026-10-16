@@ -45,3 +45,16 @@ export function applyUpdate(): void {
   if (status.state === 'ready' && canInstall) autoUpdater.quitAndInstall()
   else void shell.openExternal(RELEASES_URL)
 }
+
+export type CheckResult = 'dev' | 'latest' | 'available' | 'error'
+
+/** Manual "check for updates" from Settings. Events above still drive the badge. */
+export async function checkNow(): Promise<CheckResult> {
+  if (!app.isPackaged) return 'dev'
+  try {
+    const r = await autoUpdater.checkForUpdates()
+    return r?.isUpdateAvailable ? 'available' : 'latest'
+  } catch {
+    return 'error'
+  }
+}

@@ -7,6 +7,8 @@ directories:
 files:
   - out/**
   - package.json
+  # Tray icons are loaded at runtime via `?asset` paths that point into resources/.
+  - resources/tray*.png
 # Release artifacts get stable, arch-tagged names so the GitHub release page is readable.
 artifactName: ${productName}-${version}-${os}-${arch}.${ext}
 
