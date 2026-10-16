@@ -209,13 +209,26 @@ async function api<T>(method: string, path: string, body?: unknown): Promise<T |
     body: body ? JSON.stringify(body) : undefined
   })
   if (res.status === 204) return null
-  const text = await res.text()
-  const json = text ? JSON.parse(text) : null
+  const json = parseBody(await res.text())
   if (!res.ok) {
-    const e = json?.error
+    const e = (json as { error?: { message?: string; reason?: string } } | null)?.error
     throw new SpotifyError(e?.message ?? `HTTP ${res.status}`, e?.reason ?? (res.status === 401 ? 'NOT_CONNECTED' : undefined))
   }
   return json as T
+}
+
+/**
+ * Player commands (play, pause, next…) may answer 200 with a plain-text body
+ * (an opaque id) instead of 204 or JSON. Only JSON bodies carry data we read,
+ * so anything else counts as "no data" rather than a failure.
+ */
+function parseBody(text: string): unknown {
+  if (!text) return null
+  try {
+    return JSON.parse(text)
+  } catch {
+    return null
+  }
 }
 
 async function wrap<T>(fn: () => Promise<T>): Promise<SpotifyResult<T>> {
