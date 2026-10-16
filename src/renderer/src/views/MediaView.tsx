@@ -26,12 +26,14 @@ export function MediaView() {
 function RadioDeck() {
   const audio = useAudio()
   const [stations, setStations] = usePersistentState('stations', [])
-  const [volume, setVolume, volumeReady] = usePersistentState('volume', 0.6)
+  // The engine owns the live volume (the menu bar popover can change it too); this view only persists it.
+  const [, persistVolume] = usePersistentState('volume', 0.6)
+  const volume = audio.volume
+  const setVolume = (v: number): void => {
+    audioEngine.setVolume(v)
+    persistVolume(v)
+  }
   const [adding, setAdding] = useState(false)
-
-  useEffect(() => {
-    if (volumeReady) audioEngine.setVolume(volume)
-  }, [volume, volumeReady])
 
   const VolIcon = volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2
 

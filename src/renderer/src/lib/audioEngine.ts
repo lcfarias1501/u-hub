@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import type { RadioStation } from '@shared/types'
+import logo from '@renderer/assets/logo.png'
 
 interface AudioState {
   station: RadioStation | null
@@ -21,6 +22,8 @@ class AudioEngine {
   analyser: AnalyserNode | null = null
   private state: AudioState = { station: null, playing: false, loading: false, error: null, volume: 0.6 }
   private listeners = new Set<() => void>()
+  /** Station skipping needs the station list, which the radio bridge provides. */
+  skip: ((dir: 1 | -1) => void) | null = null
 
   constructor() {
     this.el.crossOrigin = 'anonymous'
@@ -32,11 +35,29 @@ class AudioEngine {
       if (!this.el.getAttribute('src')) return
       this.patch({ playing: false, loading: false, error: 'Stream indisponível' })
     })
+
+    // macOS "Now Playing" / Windows media overlay and the keyboard media keys.
+    const ms = navigator.mediaSession
+    ms.setActionHandler('play', () => this.state.station && void this.play(this.state.station))
+    ms.setActionHandler('pause', () => this.pause())
+    ms.setActionHandler('stop', () => this.stop())
+    ms.setActionHandler('nexttrack', () => this.skip?.(1))
+    ms.setActionHandler('previoustrack', () => this.skip?.(-1))
   }
 
   private patch(p: Partial<AudioState>): void {
     this.state = { ...this.state, ...p }
+    navigator.mediaSession.playbackState = this.state.playing ? 'playing' : this.state.station ? 'paused' : 'none'
     this.listeners.forEach((l) => l())
+  }
+
+  private describe(station: RadioStation): void {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: station.name,
+      artist: station.genre,
+      album: 'U-Hub Radio',
+      artwork: [{ src: new URL(logo, location.href).href, sizes: '256x256', type: 'image/png' }]
+    })
   }
 
   private ensureGraph(): void {
@@ -65,6 +86,7 @@ class AudioEngine {
       this.el.src = station.url
     }
     this.patch({ station, loading: true, error: null })
+    this.describe(station)
     try {
       await this.el.play()
     } catch (err) {

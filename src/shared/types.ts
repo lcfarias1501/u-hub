@@ -224,3 +224,16 @@ export interface UpdateStatus {
   /** False on macOS, where unsigned apps can't self-update; the UI links to the release instead. */
   canInstall?: boolean
 }
+
+// ── Radio relay (main window ⇄ menu bar popover) ─────────────────────────────
+
+/** Snapshot of the radio, published by the main window (which owns the audio element). */
+export interface RadioState {
+  station: { id: string; name: string; genre: string } | null
+  playing: boolean
+  loading: boolean
+  error: string | null
+  volume: number
+}
+
+export type RadioCommand = { type: 'toggle' } | { type: 'next' } | { type: 'prev' } | { type: 'stop' } | { type: 'volume'; value: number }

@@ -52,6 +52,30 @@
   }
 }
 
+/* Range sliders (volume etc.): the track is painted inline per slider; this styles the thumb. */
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  border-radius: 999px;
+  outline: none;
+}
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-volt) 35%, transparent), 0 0 10px var(--color-volt);
+  transition: transform 150ms var(--ease-snap);
+}
+input[type='range']:hover::-webkit-slider-thumb {
+  transform: scale(1.2);
+}
+input[type='range']:disabled::-webkit-slider-thumb {
+  background: #52525b;
+  box-shadow: none;
+}
+
 /* Backdrop: a faint blueprint grid with two off-canvas glows. */
 .hub-backdrop {
   background:
@@ -177,4 +201,10 @@
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Menu bar popover window: transparent so the native vibrancy and rounded corners show through. */
+html.popover,
+html.popover body {
+  background: transparent;
 }

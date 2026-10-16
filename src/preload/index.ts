@@ -4,6 +4,8 @@ import type {
   BackupSummary,
   LaunchResult,
   ModuleId,
+  RadioCommand,
+  RadioState,
   SpotifyCommand,
   SpotifyDevice,
   SpotifyPlayback,
@@ -71,6 +73,31 @@ const api = {
       const listener = (_: unknown, v: ModuleId): void => cb(v)
       ipcRenderer.on('nav:go', listener)
       return () => ipcRenderer.off('nav:go', listener)
+    }
+  },
+  /** Radio relay: the main window publishes and executes; the menu bar popover reads and commands. */
+  radio: {
+    publish: (state: RadioState): void => ipcRenderer.send('radio:publish', state),
+    get: (): Promise<RadioState> => ipcRenderer.invoke('radio:get'),
+    onState: (cb: (s: RadioState) => void): (() => void) => {
+      const listener = (_: unknown, s: RadioState): void => cb(s)
+      ipcRenderer.on('radio:state', listener)
+      return () => ipcRenderer.off('radio:state', listener)
+    },
+    command: (cmd: RadioCommand): void => ipcRenderer.send('radio:command', cmd),
+    onCommand: (cb: (cmd: RadioCommand) => void): (() => void) => {
+      const listener = (_: unknown, c: RadioCommand): void => cb(c)
+      ipcRenderer.on('radio:command', listener)
+      return () => ipcRenderer.off('radio:command', listener)
+    }
+  },
+  popover: {
+    hide: (): void => ipcRenderer.send('popover:hide'),
+    showMain: (): void => ipcRenderer.send('app:showMain'),
+    onShown: (cb: () => void): (() => void) => {
+      const listener = (): void => cb()
+      ipcRenderer.on('popover:shown', listener)
+      return () => ipcRenderer.off('popover:shown', listener)
     }
   },
   backup: {

@@ -6,6 +6,7 @@ import { navItems } from './components/nav'
 import { useModHotkeys } from './hooks/useHotkeys'
 import { usePersistentState } from './hooks/usePersistentState'
 import { SettingsProvider, useSettings } from './lib/settings'
+import { startRadioBridge } from './lib/radioBridge'
 import { startSystemFeed } from './lib/systemFeed'
 import { MediaView } from './views/MediaView'
 import { PerformanceView } from './views/PerformanceView'
@@ -14,6 +15,7 @@ import { SettingsView } from './views/SettingsView'
 import { VaultView } from './views/VaultView'
 
 startSystemFeed()
+startRadioBridge()
 
 export default function App() {
   return (

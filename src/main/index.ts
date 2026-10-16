@@ -2,6 +2,7 @@ import { join } from 'node:path'
 import { BrowserWindow, app, clipboard, ipcMain, session, shell } from 'electron'
 import type { AppInfo, SpotifyCommand, StoreSchema, VaultEntry } from '@shared/types'
 import { exportBackup, inspectBackup, restoreBackup } from './backup'
+import { registerPopoverIpc } from './popover'
 import { launch } from './launcher'
 import { applySettings, canOpenAtLogin, quitting, showWindow } from './shellIntegration'
 import * as spotify from './spotify'
@@ -159,6 +160,11 @@ function registerIpc(): void {
     restoreBackup(password || null)
     applySettings(getSettings(), () => win)
   })
+
+  registerPopoverIpc(
+    () => win,
+    () => showWindow(win)
+  )
 
   ipcMain.handle('launcher:run', (_e, id: string) => {
     const l = getValue('launchers').find((x) => x.id === id)

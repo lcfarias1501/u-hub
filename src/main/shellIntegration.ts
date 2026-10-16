@@ -1,5 +1,6 @@
 import { Menu, Tray, app, nativeImage, type BrowserWindow } from 'electron'
 import type { AppSettings, ModuleId } from '@shared/types'
+import * as popover from './popover'
 import trayColor from '../../resources/tray.png?asset'
 import trayTemplate from '../../resources/trayTemplate.png?asset'
 import trayTemplate2x from '../../resources/trayTemplate@2x.png?asset'
@@ -40,33 +41,39 @@ function syncTray(settings: AppSettings, getWin: () => BrowserWindow | null): vo
   if (!settings.closeToTray) {
     tray?.destroy()
     tray = null
+    popover.destroy()
     return
   }
   tray ??= new Tray(trayImage())
   tray.setToolTip('U-Hub')
-  tray.removeAllListeners('click')
-  // On macOS a click opens the menu; on Windows/Linux a click toggles the window.
-  if (process.platform !== 'darwin') {
-    tray.on('click', () => {
-      const win = getWin()
-      if (win?.isVisible() && !win.isMinimized()) win.hide()
-      else showWindow(win)
-    })
-  }
   const open = (view?: ModuleId): void => {
     const win = getWin()
     showWindow(win)
     if (view) win?.webContents.send('nav:go', view)
   }
-  tray.setContextMenu(
-    Menu.buildFromTemplate([
-      { label: 'Abrir U-Hub', click: () => open() },
-      { type: 'separator' },
-      ...settings.modules.filter((m) => m.visible).map((m) => ({ label: MODULE_LABELS[m.id], click: () => open(m.id) })),
-      { type: 'separator' },
-      { label: 'Sair', click: () => app.quit() }
-    ])
-  )
+  const menu = Menu.buildFromTemplate([
+    { label: 'Abrir U-Hub', click: () => open() },
+    { type: 'separator' },
+    ...settings.modules.filter((m) => m.visible).map((m) => ({ label: MODULE_LABELS[m.id], click: () => open(m.id) })),
+    { type: 'separator' },
+    { label: 'Sair', click: () => app.quit() }
+  ])
+
+  tray.removeAllListeners('click')
+  tray.removeAllListeners('right-click')
+  tray.removeAllListeners('double-click')
+  if (process.platform === 'linux') {
+    // Many Linux desktops never emit tray click events; the context menu is the only reliable entry point.
+    tray.setContextMenu(menu)
+    return
+  }
+  // Left click: now-playing popover. Right click: the menu. Double click (Windows): open the app.
+  tray.on('click', (_e, bounds) => popover.toggle(bounds))
+  tray.on('right-click', () => {
+    popover.hide()
+    tray?.popUpContextMenu(menu)
+  })
+  tray.on('double-click', () => open())
 }
 
 /** Applies OS-level side effects of the settings: login item, tray, zoom. Safe to call repeatedly. */
