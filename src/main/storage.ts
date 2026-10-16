@@ -57,6 +57,14 @@ const store = new Store<StoreSchema & PrivateSchema>({
       { id: 'q-3', title: 'Daily: missões semanais da season', tag: 'daily', column: 'done', createdAt: Date.now() }
     ],
     launchers: defaultLaunchers(),
+    // Ids match the categories of the first release, so existing vault entries keep their category.
+    vaultCategories: [
+      { id: 'steam', label: 'Steam', icon: 'gamepad', accent: 'sky' },
+      { id: 'discord', label: 'Discord', icon: 'message-circle', accent: 'indigo' },
+      { id: 'minecraft', label: 'Minecraft Server', icon: 'pickaxe', accent: 'emerald' },
+      { id: 'battlenet', label: 'Battle.net', icon: 'swords', accent: 'blue' },
+      { id: 'other', label: 'Outros', icon: 'key-round', accent: 'zinc' }
+    ],
     stations: DEFAULT_STATIONS,
     playlists: [{ id: 'pl-lofi', name: 'lofi beats', uri: 'spotify:playlist:37i9dQZF1DWWQRwui0ExPn' }],
     volume: 0.6,
@@ -68,7 +76,7 @@ const store = new Store<StoreSchema & PrivateSchema>({
 })
 
 const PUBLIC_KEYS = new Set<StoreKey>([
-  'sidebarCollapsed', 'lastView', 'perfLayout', 'quests', 'launchers', 'stations', 'playlists', 'volume'
+  'sidebarCollapsed', 'lastView', 'perfLayout', 'quests', 'launchers', 'stations', 'playlists', 'volume', 'vaultCategories'
 ])
 
 export function isPublicKey(key: unknown): key is StoreKey {

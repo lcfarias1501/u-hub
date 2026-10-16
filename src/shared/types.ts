@@ -18,11 +18,24 @@ export interface SystemStatic {
   arch: string
 }
 
-export type VaultCategory = 'steam' | 'discord' | 'minecraft' | 'battlenet' | 'other'
+/** Shared colour tokens for user-picked accents (vault categories, launcher tiles). */
+export type Accent = 'violet' | 'indigo' | 'blue' | 'sky' | 'emerald' | 'amber' | 'rose' | 'zinc'
+
+/** User-defined vault category. Entries reference it by `id`. */
+export interface VaultCategoryDef {
+  id: string
+  label: string
+  /** Key into the renderer's icon registry (lib/icons.ts). */
+  icon: string
+  accent: Accent
+}
+
+/** The fallback category: can be edited but never deleted; entries of deleted categories move here. */
+export const FALLBACK_CATEGORY_ID = 'other'
 
 export interface VaultEntry {
   id: string
-  category: VaultCategory
+  category: string
   title: string
   username: string
   secret: string
@@ -51,7 +64,7 @@ export interface Launcher {
   /** App name/executable path, a folder/file path, or a URL (http, steam://, discord://…). */
   target: string
   icon: string
-  accent: 'violet' | 'emerald' | 'sky' | 'amber' | 'rose'
+  accent: Accent
 }
 
 export interface RadioStation {
@@ -77,6 +90,7 @@ export interface StoreSchema {
   perfLayout: string[]
   quests: Quest[]
   launchers: Launcher[]
+  vaultCategories: VaultCategoryDef[]
   stations: RadioStation[]
   playlists: SpotifyPlaylist[]
   volume: number

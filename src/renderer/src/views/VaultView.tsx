@@ -1,29 +1,25 @@
-import { Eye, EyeOff, Gamepad2, KeyRound, MessageCircle, Pencil, Pickaxe, Plus, Search, Server, ShieldCheck, Swords, Trash2, type LucideIcon } from 'lucide-react'
+import { Eye, EyeOff, KeyRound, Pencil, Plus, Search, Server, Settings2, ShieldCheck, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { VaultCategory, VaultEntry } from '@shared/types'
+import { FALLBACK_CATEGORY_ID, type VaultCategoryDef, type VaultEntry } from '@shared/types'
 import { CopyButton } from '@renderer/components/CopyButton'
 import { Field, Modal } from '@renderer/components/Modal'
+import { CategoryBadge, CategoryForm, CategoryManager, resolveCategory } from '@renderer/components/VaultCategories'
 import { MOD_LABEL, useModHotkeys } from '@renderer/hooks/useHotkeys'
+import { usePersistentState } from '@renderer/hooks/usePersistentState'
+import { ACCENTS } from '@renderer/lib/accents'
 import { uid } from '@renderer/lib/format'
+import { iconFor } from '@renderer/lib/icons'
 import { PageHeader } from './PageHeader'
-
-const CATEGORIES: Record<VaultCategory, { label: string; icon: LucideIcon; tone: string }> = {
-  steam: { label: 'Steam', icon: Gamepad2, tone: 'text-sky-300 bg-sky-500/10 border-sky-400/25' },
-  discord: { label: 'Discord', icon: MessageCircle, tone: 'text-indigo-300 bg-indigo-500/10 border-indigo-400/25' },
-  minecraft: { label: 'Minecraft Server', icon: Pickaxe, tone: 'text-emerald-300 bg-emerald-500/10 border-emerald-400/25' },
-  battlenet: { label: 'Battle.net', icon: Swords, tone: 'text-blue-300 bg-blue-500/10 border-blue-400/25' },
-  other: { label: 'Outros', icon: KeyRound, tone: 'text-zinc-300 bg-white/5 border-white/15' }
-}
-
-const EMPTY: Omit<VaultEntry, 'id' | 'updatedAt'> = { category: 'steam', title: '', username: '', secret: '', host: '', notes: '' }
 
 export function VaultView() {
   const [entries, setEntries] = useState<VaultEntry[]>([])
   const [protection, setProtection] = useState<'keychain' | 'local-key' | null>(null)
   const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState<VaultCategory | 'all'>('all')
+  const [categories, setCategories, categoriesReady] = usePersistentState('vaultCategories', [])
+  const [filter, setFilter] = useState<string>('all')
   const [revealAll, setRevealAll] = useState(false)
   const [editing, setEditing] = useState<VaultEntry | 'new' | null>(null)
+  const [managing, setManaging] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -43,19 +39,36 @@ export function VaultView() {
     void window.uhub.vault.write(next)
   }
 
+  // Entries pointing at a missing category are shown (and counted) under the fallback.
+  const categoryOf = (e: VaultEntry): VaultCategoryDef => resolveCategory(categories, e.category)
+
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
     return entries
-      .filter((e) => filter === 'all' || e.category === filter)
-      .filter((e) => !q || [e.title, e.username, e.host, e.notes, CATEGORIES[e.category].label].some((f) => f.toLowerCase().includes(q)))
+      .filter((e) => filter === 'all' || categoryOf(e).id === filter)
+      .filter((e) => !q || [e.title, e.username, e.host, e.notes, categoryOf(e).label].some((f) => f.toLowerCase().includes(q)))
       .sort((a, b) => b.updatedAt - a.updatedAt)
-  }, [entries, query, filter])
+  }, [entries, query, filter, categories])
 
   const counts = useMemo(() => {
-    const c: Partial<Record<VaultCategory, number>> = {}
-    for (const e of entries) c[e.category] = (c[e.category] ?? 0) + 1
+    const c: Record<string, number> = {}
+    for (const e of entries) {
+      const id = categoryOf(e).id
+      c[id] = (c[id] ?? 0) + 1
+    }
     return c
-  }, [entries])
+  }, [entries, categories])
+
+  const deleteCategory = (id: string): void => {
+    if (id === FALLBACK_CATEGORY_ID) return
+    setCategories(categories.filter((c) => c.id !== id))
+    if (entries.some((e) => e.category === id)) {
+      persist(entries.map((e) => (e.category === id ? { ...e, category: FALLBACK_CATEGORY_ID } : e)))
+    }
+    if (filter === id) setFilter('all')
+  }
+
+  if (!categoriesReady) return null
 
   return (
     <div className="animate-rise flex h-full flex-col p-6">
@@ -72,21 +85,28 @@ export function VaultView() {
         </button>
       </PageHeader>
 
-      <div className="mb-4 flex items-center gap-2">
+      <div className="mb-3 flex items-center gap-2">
         <div className="relative max-w-sm flex-1">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-zinc-600" />
           <input ref={searchRef} className="field pl-9" placeholder="Buscar por nome, user, IP…" value={query} onChange={(e) => setQuery(e.target.value)} />
           <kbd className="kbd absolute top-1/2 right-2 -translate-y-1/2">{MOD_LABEL}K</kbd>
         </div>
-        <div className="flex gap-1">
-          <FilterChip active={filter === 'all'} onClick={() => setFilter('all')} label="Todos" count={entries.length} />
-          {(Object.keys(CATEGORIES) as VaultCategory[]).map((c) => (
-            <FilterChip key={c} active={filter === c} onClick={() => setFilter(c)} label={CATEGORIES[c].label} count={counts[c] ?? 0} />
-          ))}
-        </div>
         <button className="btn ml-auto" onClick={() => setRevealAll((r) => !r)}>
           {revealAll ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
           {revealAll ? 'Ocultar' : 'Mostrar'} todas
+        </button>
+      </div>
+
+      {/* Category filters scroll sideways once users create many of them. */}
+      <div className="mb-4 flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto pb-1 [scrollbar-width:thin]">
+          <FilterChip active={filter === 'all'} onClick={() => setFilter('all')} label="Todos" count={entries.length} />
+          {categories.map((c) => (
+            <FilterChip key={c.id} category={c} active={filter === c.id} onClick={() => setFilter(c.id)} label={c.label} count={counts[c.id] ?? 0} />
+          ))}
+        </div>
+        <button className="btn shrink-0" onClick={() => setManaging(true)} title="Criar, editar e reordenar categorias">
+          <Settings2 className="size-3.5" /> Categorias
         </button>
       </div>
 
@@ -100,7 +120,7 @@ export function VaultView() {
       ) : (
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-3">
           {visible.map((e) => (
-            <VaultCard key={e.id} entry={e} revealAll={revealAll} onEdit={() => setEditing(e)} onDelete={() => persist(entries.filter((x) => x.id !== e.id))} />
+            <VaultCard key={e.id} entry={e} category={categoryOf(e)} revealAll={revealAll} onEdit={() => setEditing(e)} onDelete={() => persist(entries.filter((x) => x.id !== e.id))} />
           ))}
         </div>
       )}
@@ -108,6 +128,9 @@ export function VaultView() {
       {editing && (
         <VaultEditor
           initial={editing === 'new' ? null : editing}
+          categories={categories}
+          defaultCategory={filter !== 'all' ? filter : (categories[0]?.id ?? FALLBACK_CATEGORY_ID)}
+          onCreateCategory={(c) => setCategories([...categories, c])}
           onClose={() => setEditing(null)}
           onSave={(entry) => {
             const exists = entries.some((x) => x.id === entry.id)
@@ -116,28 +139,33 @@ export function VaultView() {
           }}
         />
       )}
+
+      {managing && (
+        <CategoryManager categories={categories} counts={counts} onChange={setCategories} onDelete={deleteCategory} onClose={() => setManaging(false)} />
+      )}
     </div>
   )
 }
 
-function FilterChip({ active, label, count, onClick }: { active: boolean; label: string; count: number; onClick: () => void }) {
+function FilterChip({ active, label, count, onClick, category }: { active: boolean; label: string; count: number; onClick: () => void; category?: VaultCategoryDef }) {
+  const Icon = category ? iconFor(category.icon) : null
   return (
     <button
       onClick={onClick}
-      className={`flex h-8 items-center gap-1.5 rounded-[3px] border px-2.5 text-[12px] transition-all duration-150 ${
+      className={`flex h-8 shrink-0 items-center gap-1.5 rounded-[3px] border px-2.5 text-[12px] whitespace-nowrap transition-all duration-150 ${
         active ? 'border-volt/50 bg-volt/15 text-violet-100' : 'border-transparent text-zinc-500 hover:border-white/10 hover:text-zinc-200'
       }`}
     >
+      {Icon && <Icon className={`size-3.5 ${active ? '' : ACCENTS[category!.accent].tone.split(' ')[0]}`} />}
       {label}
       <span className={`font-mono text-[10px] ${active ? 'text-volt-soft' : 'text-zinc-600'}`}>{count}</span>
     </button>
   )
 }
 
-function VaultCard({ entry, revealAll, onEdit, onDelete }: { entry: VaultEntry; revealAll: boolean; onEdit: () => void; onDelete: () => void }) {
+function VaultCard({ entry, category: cat, revealAll, onEdit, onDelete }: { entry: VaultEntry; category: VaultCategoryDef; revealAll: boolean; onEdit: () => void; onDelete: () => void }) {
   const [reveal, setReveal] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const cat = CATEGORIES[entry.category]
   const shown = reveal || revealAll
 
   useEffect(() => {
@@ -149,9 +177,7 @@ function VaultCard({ entry, revealAll, onEdit, onDelete }: { entry: VaultEntry; 
   return (
     <article className="panel panel-hover group flex flex-col">
       <header className="flex items-start gap-3 p-3 pb-2">
-        <span className={`grid size-8 shrink-0 place-items-center rounded-[3px] border ${cat.tone}`}>
-          <cat.icon className="size-4" strokeWidth={1.75} />
-        </span>
+        <CategoryBadge category={cat} className="size-8" />
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-[14px] font-semibold text-zinc-100">{entry.title || 'Sem título'}</h3>
           <div className="eyebrow">{cat.label}</div>
@@ -204,9 +230,27 @@ function Row({ label, value, display, sensitive, extra, icon }: { label: string;
   )
 }
 
-function VaultEditor({ initial, onClose, onSave }: { initial: VaultEntry | null; onClose: () => void; onSave: (e: VaultEntry) => void }) {
-  const [draft, setDraft] = useState(initial ?? { ...EMPTY, id: uid(), updatedAt: 0 })
+function VaultEditor({
+  initial,
+  categories,
+  defaultCategory,
+  onCreateCategory,
+  onClose,
+  onSave
+}: {
+  initial: VaultEntry | null
+  categories: VaultCategoryDef[]
+  defaultCategory: string
+  onCreateCategory: (c: VaultCategoryDef) => void
+  onClose: () => void
+  onSave: (e: VaultEntry) => void
+}) {
+  const [draft, setDraft] = useState<VaultEntry>(
+    initial ?? { id: uid(), category: defaultCategory, title: '', username: '', secret: '', host: '', notes: '', updatedAt: 0 }
+  )
   const [showSecret, setShowSecret] = useState(false)
+  const [creatingCategory, setCreatingCategory] = useState(false)
+  const selected = resolveCategory(categories, draft.category).id
   const set = <K extends keyof VaultEntry>(k: K, v: VaultEntry[K]): void => setDraft((d) => ({ ...d, [k]: v }))
 
   return (
@@ -219,24 +263,49 @@ function VaultEditor({ initial, onClose, onSave }: { initial: VaultEntry | null;
           onSave({ ...draft, title: draft.title.trim(), updatedAt: Date.now() })
         }}
       >
-        <div className="col-span-2 flex flex-wrap gap-1">
-          {(Object.keys(CATEGORIES) as VaultCategory[]).map((c) => {
-            const C = CATEGORIES[c]
-            return (
+        <div className="col-span-2 space-y-2">
+          <span className="eyebrow">Categoria</span>
+          <div className="flex flex-wrap gap-1">
+            {categories.map((c) => {
+              const Icon = iconFor(c.icon)
+              return (
+                <button
+                  type="button"
+                  key={c.id}
+                  onClick={() => set('category', c.id)}
+                  className={`flex h-8 items-center gap-1.5 rounded-[3px] border px-2.5 text-[12px] transition-all ${
+                    selected === c.id ? ACCENTS[c.accent].tone : 'border-white/[0.06] text-zinc-500 hover:text-zinc-200'
+                  }`}
+                >
+                  <Icon className="size-3.5" /> {c.label}
+                </button>
+              )
+            })}
+            {!creatingCategory && (
               <button
                 type="button"
-                key={c}
-                onClick={() => set('category', c)}
-                className={`flex h-8 items-center gap-1.5 rounded-[3px] border px-2.5 text-[12px] transition-all ${draft.category === c ? C.tone : 'border-white/[0.06] text-zinc-500 hover:text-zinc-200'}`}
+                onClick={() => setCreatingCategory(true)}
+                className="flex h-8 items-center gap-1 rounded-[3px] border border-dashed border-white/15 px-2.5 text-[12px] text-zinc-500 transition-colors hover:border-volt/50 hover:text-violet-200"
               >
-                <C.icon className="size-3.5" /> {C.label}
+                <Plus className="size-3.5" /> Nova
               </button>
-            )
-          })}
+            )}
+          </div>
+          {creatingCategory && (
+            <CategoryForm
+              existing={categories}
+              onCancel={() => setCreatingCategory(false)}
+              onSave={(c) => {
+                onCreateCategory(c)
+                set('category', c.id)
+                setCreatingCategory(false)
+              }}
+            />
+          )}
         </div>
         <div className="col-span-2">
           <Field label="Título / Servidor">
-            <input autoFocus className="field" value={draft.title} onChange={(e) => set('title', e.target.value)} placeholder="Ex: Conta principal Steam" />
+            <input autoFocus={!creatingCategory} className="field" value={draft.title} onChange={(e) => set('title', e.target.value)} placeholder="Ex: Conta principal Steam" />
           </Field>
         </div>
         <Field label="Username / Tag">

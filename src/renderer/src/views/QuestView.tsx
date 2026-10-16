@@ -12,35 +12,17 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, arrayMove, rectSortingStrategy, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import {
-  Box,
-  Check,
-  Code2,
-  Cpu,
-  Folder,
-  Gamepad2,
-  Globe,
-  Hammer,
-  MessageCircle,
-  Music,
-  Pencil,
-  Plus,
-  Rocket,
-  ScrollText,
-  Sun,
-  Tag,
-  Terminal,
-  Trash2,
-  Zap,
-  type LucideIcon
-} from 'lucide-react'
+import { Check, Hammer, Pencil, Plus, Rocket, ScrollText, Sun, Tag, Terminal, Trash2, type LucideIcon } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Launcher, LauncherKind, Quest, QuestColumn, QuestTag } from '@shared/types'
 import { Field, Modal } from '@renderer/components/Modal'
 import { Panel } from '@renderer/components/Panel'
+import { AccentPicker, IconPicker } from '@renderer/components/Pickers'
 import { usePersistentState } from '@renderer/hooks/usePersistentState'
+import { ACCENTS } from '@renderer/lib/accents'
 import { uid } from '@renderer/lib/format'
+import { iconFor } from '@renderer/lib/icons'
 import { PageHeader } from './PageHeader'
 
 export function QuestView() {
@@ -252,27 +234,7 @@ function QuestCard({ quest, overlay, onToggle, onRemove }: { quest: Quest; overl
 
 // ── Quick launcher ───────────────────────────────────────────────────────────
 
-const ICONS: Record<string, LucideIcon> = {
-  code: Code2,
-  terminal: Terminal,
-  gamepad: Gamepad2,
-  'message-circle': MessageCircle,
-  folder: Folder,
-  globe: Globe,
-  music: Music,
-  rocket: Rocket,
-  box: Box,
-  cpu: Cpu,
-  zap: Zap
-}
 
-const ACCENTS: Record<Launcher['accent'], { tile: string; glow: string; swatch: string }> = {
-  violet: { tile: 'text-violet-300 border-violet-400/20 bg-violet-500/[0.08]', glow: 'group-hover:shadow-[0_0_32px_-8px_#8b5cf6]', swatch: 'bg-violet-500' },
-  emerald: { tile: 'text-emerald-300 border-emerald-400/20 bg-emerald-500/[0.08]', glow: 'group-hover:shadow-[0_0_32px_-8px_#10b981]', swatch: 'bg-emerald-500' },
-  sky: { tile: 'text-sky-300 border-sky-400/20 bg-sky-500/[0.08]', glow: 'group-hover:shadow-[0_0_32px_-8px_#0ea5e9]', swatch: 'bg-sky-500' },
-  amber: { tile: 'text-amber-300 border-amber-400/20 bg-amber-500/[0.08]', glow: 'group-hover:shadow-[0_0_32px_-8px_#f59e0b]', swatch: 'bg-amber-500' },
-  rose: { tile: 'text-rose-300 border-rose-400/20 bg-rose-500/[0.08]', glow: 'group-hover:shadow-[0_0_32px_-8px_#f43f5e]', swatch: 'bg-rose-500' }
-}
 
 const KIND_LABEL: Record<LauncherKind, string> = { app: 'APP', path: 'PASTA', url: 'URL' }
 
@@ -331,7 +293,7 @@ function QuickLauncher() {
 function LauncherTile({ launcher, onEdit }: { launcher: Launcher; onEdit: () => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: launcher.id })
   const [status, setStatus] = useState<{ ok: boolean; error?: string } | null>(null)
-  const Icon = ICONS[launcher.icon] ?? Box
+  const Icon = iconFor(launcher.icon)
   const accent = ACCENTS[launcher.accent]
 
   useEffect(() => {
@@ -416,20 +378,10 @@ function LauncherEditor({ initial, onClose, onSave, onDelete }: { initial: Launc
           <input className="field" value={d.target} onChange={(e) => set('target', e.target.value)} placeholder={placeholder[d.kind]} />
         </Field>
         <Field label="Ícone">
-          <div className="flex flex-wrap gap-1">
-            {Object.entries(ICONS).map(([name, I]) => (
-              <button type="button" key={name} onClick={() => set('icon', name)} className={`grid size-8 place-items-center rounded-[3px] border transition-all ${d.icon === name ? 'border-volt/60 bg-volt/15 text-violet-200' : 'border-white/[0.06] text-zinc-500 hover:text-zinc-200'}`}>
-                <I className="size-4" />
-              </button>
-            ))}
-          </div>
+          <IconPicker value={d.icon} onChange={(v) => set('icon', v)} />
         </Field>
         <Field label="Cor">
-          <div className="flex gap-2">
-            {(Object.keys(ACCENTS) as Launcher['accent'][]).map((a) => (
-              <button type="button" key={a} onClick={() => set('accent', a)} className={`size-6 rounded-[3px] ${ACCENTS[a].swatch} transition-all ${d.accent === a ? 'ring-2 ring-white/70 ring-offset-2 ring-offset-raised' : 'opacity-50 hover:opacity-100'}`} aria-label={a} />
-            ))}
-          </div>
+          <AccentPicker value={d.accent} onChange={(v) => set('accent', v)} />
         </Field>
         <div className="flex gap-2 pt-1">
           {initial && (
