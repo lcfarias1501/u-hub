@@ -6,6 +6,7 @@ import logo from '@renderer/assets/logo.png'
 import { Settings } from 'lucide-react'
 import { MOD_LABEL } from '@renderer/hooks/useHotkeys'
 import { navItemFor } from './nav'
+import { NotificationCenter } from './NotificationCenter'
 import { UpdateBadge } from './UpdateBadge'
 
 function Clock() {
@@ -17,7 +18,7 @@ function Clock() {
   return <span className="tabular-nums">{now.toLocaleTimeString('pt-BR', { hour12: false })}</span>
 }
 
-export function TopBar({ view, onOpenSettings }: { view: ViewId; onOpenSettings: () => void }) {
+export function TopBar({ view, onOpenSettings, onNavigate }: { view: ViewId; onOpenSettings: () => void; onNavigate: (v: ViewId) => void }) {
   const { latest } = useSystemFeed()
   const lvl = systemLevel(latest)
   const level = LEVEL_META[lvl]
@@ -51,6 +52,7 @@ export function TopBar({ view, onOpenSettings }: { view: ViewId; onOpenSettings:
         <span className="text-zinc-500">
           <Clock />
         </span>
+        <NotificationCenter onNavigate={onNavigate} />
         <button
           onClick={onOpenSettings}
           title={`Configurações (${MOD_LABEL},)`}

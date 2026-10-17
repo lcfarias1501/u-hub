@@ -102,6 +102,18 @@ export interface AppSettings {
   reduceMotion: boolean
   sidebarMode: 'remember' | 'expanded' | 'collapsed'
   zoom: number
+  // Notifications
+  notifications: NotificationSettings
+}
+
+/** Everything is always recorded in the in-app center; these control the OS popups. */
+export interface NotificationSettings {
+  system: Record<NotificationKind, boolean>
+  /** No OS popups while a game from the library is running. */
+  quietWhilePlaying: boolean
+  sound: boolean
+  /** Unread count on the Dock / taskbar icon. */
+  badge: boolean
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -121,7 +133,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
   accent: 'violet',
   reduceMotion: false,
   sidebarMode: 'remember',
-  zoom: 1
+  zoom: 1,
+  notifications: {
+    system: { free: true, price: true, patch: true, game: false, system: true },
+    quietWhilePlaying: true,
+    sound: true,
+    badge: true
+  }
 }
 
 /**
@@ -135,7 +153,13 @@ export function normalizeSettings(stored: Partial<AppSettings> | null | undefine
   for (const [i, def] of DEFAULT_SETTINGS.modules.entries()) {
     if (!modules.some((m) => m.id === def.id)) modules.splice(Math.min(i, modules.length), 0, { ...def })
   }
-  return { ...s, modules }
+  // Nested objects merge field by field so new keys get their defaults.
+  const notifications = {
+    ...DEFAULT_SETTINGS.notifications,
+    ...stored?.notifications,
+    system: { ...DEFAULT_SETTINGS.notifications.system, ...stored?.notifications?.system }
+  }
+  return { ...s, modules, notifications }
 }
 
 export interface AppInfo {

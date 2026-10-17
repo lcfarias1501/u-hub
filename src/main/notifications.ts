@@ -1,29 +1,44 @@
 import { randomUUID } from 'node:crypto'
-import { Notification, shell, type BrowserWindow } from 'electron'
+import { Notification, app, shell, type BrowserWindow } from 'electron'
 import type { AppNotification } from '@shared/types'
-import { getValue, setValue } from './storage'
+import { snapshot as librarySnapshot } from './games'
+import { getSettings, getValue, onSettingsChange, onValueChange, setValue } from './storage'
 
 const MAX_KEPT = 200
 
 let getWin: () => BrowserWindow | null = () => null
 
+/** Dock (macOS) / taskbar (Linux) badge with the unread count, if enabled. */
+function syncBadge(): void {
+  const unread = getSettings().notifications.badge ? getValue('notifications').filter((n) => !n.read).length : 0
+  app.setBadgeCount(unread)
+}
+
 export function initNotifications(win: () => BrowserWindow | null): void {
   getWin = win
+  syncBadge()
+  // The renderer marks items read / clears them by writing the list.
+  onValueChange('notifications', syncBadge)
+  onSettingsChange(syncBadge)
 }
 
 /**
- * Records a notification in the in-app center and, unless `silent`, shows a
- * system notification. Clicking the system one opens the app on `view`, or the URL.
+ * Records a notification in the in-app center and, if the user's settings
+ * allow it for this kind, shows a system notification. Clicking that opens the
+ * app on `view`, or the URL.
  */
-export function notify(n: Omit<AppNotification, 'id' | 'createdAt' | 'read'>, opts: { silent?: boolean } = {}): AppNotification {
+export function notify(n: Omit<AppNotification, 'id' | 'createdAt' | 'read'>): AppNotification {
   const entry: AppNotification = { ...n, id: randomUUID(), createdAt: Date.now(), read: false }
   setValue('notifications', [entry, ...getValue('notifications')].slice(0, MAX_KEPT))
   getWin()?.webContents.send('notifications:new', entry)
 
-  if (!opts.silent && Notification.isSupported()) {
-    const sys = new Notification({ title: n.title, body: n.body, silent: false })
+  const prefs = getSettings().notifications
+  const gaming = prefs.quietWhilePlaying && librarySnapshot().nowPlaying.length > 0
+  if (prefs.system[n.kind] && !gaming && Notification.isSupported()) {
+    const sys = new Notification({ title: n.title, body: n.body, silent: !prefs.sound })
     sys.on('click', () => {
       const win = getWin()
+      markRead(entry.id)
       if (n.view && win) {
         win.show()
         win.focus()
@@ -33,4 +48,11 @@ export function notify(n: Omit<AppNotification, 'id' | 'createdAt' | 'read'>, op
     sys.show()
   }
   return entry
+}
+
+function markRead(id: string): void {
+  setValue(
+    'notifications',
+    getValue('notifications').map((x) => (x.id === id ? { ...x, read: true } : x))
+  )
 }

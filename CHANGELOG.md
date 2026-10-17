@@ -20,9 +20,15 @@ com os grupos **Adicionado**, **Melhorado** e **Corrigido**.
 - **Notificações do sistema** para jogos grátis novos, alertas de preço e patches dos jogos que você jogou nos últimos 30 dias.
 - **Configurações → Geral → Região das lojas**: escolha a região/moeda dos preços (automático segue a região do sistema).
 - **Novidades**: depois de atualizar, o app mostra o que mudou; o histórico fica em Configurações → Dados & Sobre.
+- **Central de notificações**: sino no topo com contador de não lidas; lista com filtro de não lidas, marcar todas como lidas e limpar. Clicar abre a tela certa do app (ou o link).
+- **Resumo de sessão**: ao fechar um jogo depois de 10 minutos ou mais, fica registrado quanto você jogou.
+- **Configurações → Notificações**: escolha quais tipos aparecem como notificação do sistema, "Não perturbe enquanto joga", som e contador de não lidas no ícone do Dock.
 
 ### Melhorado
 - Telas abertas passam a refletir na hora dados alterados em segundo plano (ex.: preços da lista de desejos).
+
+### Corrigido
+- Menus flutuantes (seletor de dispositivos do Spotify e outros) abriam fora de posição.
 
 ## [0.3.0] - 2026-10-16
 

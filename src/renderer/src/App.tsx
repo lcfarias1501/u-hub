@@ -91,7 +91,7 @@ function Shell() {
 
   return (
     <div className="hub-backdrop flex h-full flex-col">
-      <TopBar view={view} onOpenSettings={() => setView(view === 'settings' ? (lastView as ViewId) : 'settings')} />
+      <TopBar view={view} onNavigate={setView} onOpenSettings={() => setView(view === 'settings' ? (lastView as ViewId) : 'settings')} />
       <div className="flex min-h-0 flex-1">
         <Sidebar items={items} active={view} collapsed={collapsed} onSelect={setView} onToggle={() => setCollapsed((c) => !c)} />
         <main className="relative min-w-0 flex-1 overflow-y-auto">

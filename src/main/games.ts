@@ -5,6 +5,7 @@ import { basename, dirname, extname, join, sep } from 'node:path'
 import { shell } from 'electron'
 import type { Game, LaunchResult, LibrarySnapshot, NowPlayingGame, PlaytimeLog } from '@shared/types'
 import { launch } from './launcher'
+import { notify } from './notifications'
 import { getValue, onValueChange, setValue } from './storage'
 import { parseVdf, vdfGet, type Vdf } from './vdf'
 
@@ -13,6 +14,8 @@ const RESCAN_MS = 10 * 60_000
 /** A gap longer than this between polls (sleep, suspended app) isn't counted as playtime. */
 const MAX_TICK_MS = POLL_MS * 2
 const KEEP_DAYS = 120
+/** Sessions shorter than this (quick launches, crashes) get no summary. */
+const SUMMARY_MIN_MS = 10 * 60_000
 
 // ── Steam ────────────────────────────────────────────────────────────────────
 
@@ -230,6 +233,12 @@ async function runningPaths(): Promise<string[]> {
   return out.split('\n').map((l) => l.trim()).filter(Boolean)
 }
 
+function fmtDuration(ms: number): string {
+  const m = Math.round(ms / 60_000)
+  if (m < 60) return `${m}min`
+  return m % 60 ? `${Math.floor(m / 60)}h ${m % 60}min` : `${Math.floor(m / 60)}h`
+}
+
 const dayKey = (t: number): string => {
   const d = new Date(t)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -270,6 +279,19 @@ async function poll(): Promise<void> {
 
   const next = active.map((g) => nowPlaying.find((n) => n.id === g.id) ?? { id: g.id, name: g.name, startedAt: now })
   const changed = next.length !== nowPlaying.length || next.some((n) => !before.has(n.id))
+
+  // Games that just closed: summarize the session.
+  for (const ended of nowPlaying.filter((n) => !next.some((x) => x.id === n.id))) {
+    const played = now - ended.startedAt
+    if (played < SUMMARY_MIN_MS) continue
+    const total = log[ended.id]?.totalMs
+    notify({
+      kind: 'game',
+      title: `Sessão de ${ended.name} encerrada`,
+      body: `Você jogou ${fmtDuration(played)}${total ? ` · total ${fmtDuration(total)}` : ''}`,
+      view: 'library'
+    })
+  }
   nowPlaying = next
   if (changed) nowPlayingListeners.forEach((l) => l(nowPlaying))
   if (changed || active.length) emit()

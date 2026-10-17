@@ -3,6 +3,7 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities'
 import {
   Archive,
+  Bell,
   ArrowDownToLine,
   ArrowUpFromLine,
   Check,
@@ -18,7 +19,7 @@ import {
   TriangleAlert
 } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import type { AppInfo, AppSettings, BackupSummary, ModuleId, SpotifyStatus, ThemeAccent } from '@shared/types'
+import type { AppInfo, AppSettings, BackupSummary, ModuleId, NotificationKind, SpotifyStatus, ThemeAccent } from '@shared/types'
 import { Segmented, SettingRow, Switch } from '@renderer/components/Controls'
 import { Field } from '@renderer/components/Modal'
 import { Panel } from '@renderer/components/Panel'
@@ -48,6 +49,7 @@ const SECTIONS = [
   { id: 'modules', label: 'Módulos', icon: LayoutGrid },
   { id: 'general', label: 'Geral', icon: SlidersHorizontal },
   { id: 'appearance', label: 'Aparência', icon: Palette },
+  { id: 'notifications', label: 'Notificações', icon: Bell },
   { id: 'data', label: 'Dados & Sobre', icon: Archive }
 ] as const
 
@@ -100,6 +102,7 @@ export function SettingsView() {
           <ModulesSection />
           <GeneralSection info={info} />
           <AppearanceSection />
+          <NotificationsSection />
           <DataSection info={info} />
         </div>
       </div>
@@ -287,6 +290,40 @@ function AppearanceSection() {
       </SettingRow>
       <SettingRow title="Reduzir animações" description="Desliga transições e efeitos de movimento.">
         <Switch checked={settings.reduceMotion} onChange={(reduceMotion) => update({ reduceMotion })} label="Reduzir animações" />
+      </SettingRow>
+    </Section>
+  )
+}
+
+// ── Notifications ────────────────────────────────────────────────────────────
+
+const KINDS: { kind: NotificationKind; title: string; description: string }[] = [
+  { kind: 'free', title: 'Jogos grátis', description: 'Quando a Epic libera um jogo grátis novo.' },
+  { kind: 'price', title: 'Alertas de preço', description: 'Quando um jogo da lista de desejos entra em promoção ou chega no seu preço.' },
+  { kind: 'patch', title: 'Patches', description: 'Notas de atualização dos jogos da Steam que você jogou nos últimos 30 dias.' },
+  { kind: 'game', title: 'Resumo de sessão', description: 'Quanto tempo você jogou, quando fecha um jogo (sessões de 10 min ou mais).' }
+]
+
+function NotificationsSection() {
+  const { settings, update } = useSettings()
+  const n = settings.notifications
+  const set = (patch: Partial<typeof n>): void => update({ notifications: { ...n, ...patch } })
+  return (
+    <Section id="notifications" title="Notificações" icon={<Bell />}>
+      <p className="py-3 text-[12px] text-zinc-500">Tudo fica registrado no sino do topo. Aqui você escolhe o que também aparece como notificação do sistema.</p>
+      {KINDS.map((k) => (
+        <SettingRow key={k.kind} title={k.title} description={k.description}>
+          <Switch checked={n.system[k.kind]} onChange={(v) => set({ system: { ...n.system, [k.kind]: v } })} label={k.title} />
+        </SettingRow>
+      ))}
+      <SettingRow title="Não perturbe enquanto joga" description="Segura as notificações do sistema enquanto um jogo da Biblioteca estiver aberto. Elas continuam no sino.">
+        <Switch checked={n.quietWhilePlaying} onChange={(quietWhilePlaying) => set({ quietWhilePlaying })} label="Não perturbe enquanto joga" />
+      </SettingRow>
+      <SettingRow title="Som" description="Toca o som padrão do sistema com cada notificação.">
+        <Switch checked={n.sound} onChange={(sound) => set({ sound })} label="Som das notificações" />
+      </SettingRow>
+      <SettingRow title="Contador no ícone do app" description="Mostra o número de não lidas no ícone do Dock / barra de tarefas.">
+        <Switch checked={n.badge} onChange={(badge) => set({ badge })} label="Contador no ícone" />
       </SettingRow>
     </Section>
   )
