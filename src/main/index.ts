@@ -1,7 +1,9 @@
 import { join } from 'node:path'
-import { BrowserWindow, app, clipboard, dialog, ipcMain, session, shell } from 'electron'
+import { BrowserWindow, app, clipboard, dialog, globalShortcut, ipcMain, session, shell } from 'electron'
 import type { AppInfo, SpotifyCommand, StoreSchema, VaultEntry } from '@shared/types'
 import { exportBackup, inspectBackup, restoreBackup } from './backup'
+import { discordStatus, startDiscord, stopDiscord } from './discord'
+import { applyShortcuts, initShortcuts, pauseShortcuts, shortcutStatus } from './shortcuts'
 import { launchGame, onLibraryChange, revealGame, scan as scanLibrary, snapshot as librarySnapshot, startLibrary, suggestName } from './games'
 import { initNotifications } from './notifications'
 import { registerPopoverIpc } from './popover'
@@ -190,6 +192,10 @@ function registerIpc(): void {
     return canceled || !filePaths[0] ? null : { path: filePaths[0], name: suggestName(filePaths[0]) }
   })
 
+  ipcMain.handle('shortcuts:status', () => shortcutStatus())
+  ipcMain.handle('shortcuts:pause', (_e, pause: boolean) => pauseShortcuts(!!pause))
+  ipcMain.handle('discord:status', () => discordStatus())
+
   ipcMain.handle('radar:get', () => radarSnapshot())
   ipcMain.handle('radar:refresh', () => refreshRadar())
   ipcMain.handle('radar:search', (_e, term: string) => searchSteam(String(term)))
@@ -210,11 +216,28 @@ app.whenReady().then(() => {
   initNotifications(() => win)
   startLibrary()
   startRadar(() => win)
+  initShortcuts(
+    () => win,
+    () => showWindow(win)
+  )
+  let lastShortcuts = JSON.stringify(getSettings().shortcuts)
+  applyShortcuts(getSettings().shortcuts)
+  onSettingsChange((s) => {
+    const next = JSON.stringify(s.shortcuts)
+    if (next === lastShortcuts) return
+    lastShortcuts = next
+    win?.webContents.send('shortcuts:status', applyShortcuts(s.shortcuts))
+  })
+  startDiscord(() => win)
   onLibraryChange((s) => win?.webContents.send('library:update', s))
   applySettings(getSettings(), () => win)
   onSettingsChange((s) => applySettings(s, () => win))
   app.on('activate', () => (win ? showWindow(win) : createWindow()))
 })
+
+// Leave no stale status on the user's Discord profile.
+app.on('before-quit', () => stopDiscord())
+app.on('will-quit', () => globalShortcut.unregisterAll())
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()

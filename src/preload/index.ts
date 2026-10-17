@@ -7,6 +7,8 @@ import type {
   AppNotification,
   RadarSnapshot,
   SteamSearchResult,
+  DiscordStatus,
+  ShortcutStatus,
   ModuleId,
   RadioCommand,
   RadioState,
@@ -116,6 +118,24 @@ const api = {
     export: (password: string | null): Promise<{ ok: boolean; path?: string }> => ipcRenderer.invoke('backup:export', password),
     inspect: (): Promise<BackupSummary | null> => ipcRenderer.invoke('backup:inspect'),
     restore: (password: string | null): Promise<void> => ipcRenderer.invoke('backup:restore', password)
+  },
+  shortcuts: {
+    status: (): Promise<ShortcutStatus> => ipcRenderer.invoke('shortcuts:status'),
+    /** Suspend global shortcuts while the user records a new combination. */
+    pause: (pause: boolean): Promise<void> => ipcRenderer.invoke('shortcuts:pause', pause),
+    onStatus: (cb: (s: ShortcutStatus) => void): (() => void) => {
+      const listener = (_: unknown, s: ShortcutStatus): void => cb(s)
+      ipcRenderer.on('shortcuts:status', listener)
+      return () => ipcRenderer.off('shortcuts:status', listener)
+    }
+  },
+  discord: {
+    status: (): Promise<DiscordStatus> => ipcRenderer.invoke('discord:status'),
+    onStatus: (cb: (s: DiscordStatus) => void): (() => void) => {
+      const listener = (_: unknown, s: DiscordStatus): void => cb(s)
+      ipcRenderer.on('discord:status', listener)
+      return () => ipcRenderer.off('discord:status', listener)
+    }
   },
   radar: {
     get: (): Promise<RadarSnapshot> => ipcRenderer.invoke('radar:get'),

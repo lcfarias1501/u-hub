@@ -12,3 +12,7 @@ declare module '*?asset' {
   const path: string
   export default path
 }
+
+interface ImportMetaEnv {
+  readonly MAIN_VITE_DISCORD_CLIENT_ID?: string
+}

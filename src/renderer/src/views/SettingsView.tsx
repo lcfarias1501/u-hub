@@ -4,6 +4,8 @@ import { CSS } from '@dnd-kit/utilities'
 import {
   Archive,
   Bell,
+  Keyboard,
+  MessageSquare,
   ArrowDownToLine,
   ArrowUpFromLine,
   Check,
@@ -31,6 +33,7 @@ import { CHANGELOG } from '@renderer/lib/changelog'
 import { useSettings } from '@renderer/lib/settings'
 import { THEME } from '@renderer/lib/theme'
 import { PageHeader } from './PageHeader'
+import { DiscordSection, ShortcutsSection } from './settings/ShortcutsDiscord'
 
 const REGIONS: Record<string, string> = {
   BR: 'Brasil',
@@ -50,6 +53,8 @@ const SECTIONS = [
   { id: 'general', label: 'Geral', icon: SlidersHorizontal },
   { id: 'appearance', label: 'Aparência', icon: Palette },
   { id: 'notifications', label: 'Notificações', icon: Bell },
+  { id: 'shortcuts', label: 'Atalhos', icon: Keyboard },
+  { id: 'discord', label: 'Discord', icon: MessageSquare },
   { id: 'data', label: 'Dados & Sobre', icon: Archive }
 ] as const
 
@@ -103,6 +108,8 @@ export function SettingsView() {
           <GeneralSection info={info} />
           <AppearanceSection />
           <NotificationsSection />
+          <ShortcutsSection />
+          <DiscordSection />
           <DataSection info={info} />
         </div>
       </div>

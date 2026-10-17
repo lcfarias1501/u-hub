@@ -104,7 +104,36 @@ export interface AppSettings {
   zoom: number
   // Notifications
   notifications: NotificationSettings
+  /** Electron accelerators ('' = unassigned). Global: they work while U-Hub is in the background. */
+  shortcuts: Record<ShortcutAction, string>
+  discord: DiscordSettings
 }
+
+export type ShortcutAction = 'toggleWindow' | 'mediaPlayPause' | 'mediaNext' | 'mediaPrev' | 'radioVolumeUp' | 'radioVolumeDown'
+
+export interface DiscordSettings {
+  enabled: boolean
+  /** Own Discord Application ID; null = the one built into this release. */
+  clientId: string | null
+  showGames: boolean
+  showRadio: boolean
+  /** Show "No U-Hub" when nothing is playing (otherwise the status is cleared). */
+  showIdle: boolean
+  /** "Baixar U-Hub" button on the status. */
+  showButton: boolean
+}
+
+export type DiscordState = 'off' | 'no-client-id' | 'connecting' | 'not-running' | 'connected'
+
+export interface DiscordStatus {
+  state: DiscordState
+  user: string | null
+  /** What's currently shown, for the settings preview. */
+  activity: { type: number; details: string; state?: string } | null
+  hasBuiltInClientId: boolean
+}
+
+export type ShortcutStatus = Record<ShortcutAction, 'ok' | 'conflict' | 'unset'>
 
 /** Everything is always recorded in the in-app center; these control the OS popups. */
 export interface NotificationSettings {
@@ -139,7 +168,17 @@ export const DEFAULT_SETTINGS: AppSettings = {
     quietWhilePlaying: true,
     sound: true,
     badge: true
-  }
+  },
+  // ⌥⇧ / Alt+Shift combos are rarely taken by other apps.
+  shortcuts: {
+    toggleWindow: 'Alt+Shift+U',
+    mediaPlayPause: 'Alt+Shift+P',
+    mediaNext: 'Alt+Shift+Right',
+    mediaPrev: 'Alt+Shift+Left',
+    radioVolumeUp: '',
+    radioVolumeDown: ''
+  },
+  discord: { enabled: true, clientId: null, showGames: true, showRadio: true, showIdle: false, showButton: true }
 }
 
 /**
@@ -159,7 +198,9 @@ export function normalizeSettings(stored: Partial<AppSettings> | null | undefine
     ...stored?.notifications,
     system: { ...DEFAULT_SETTINGS.notifications.system, ...stored?.notifications?.system }
   }
-  return { ...s, modules, notifications }
+  const shortcuts = { ...DEFAULT_SETTINGS.shortcuts, ...stored?.shortcuts }
+  const discord = { ...DEFAULT_SETTINGS.discord, ...stored?.discord }
+  return { ...s, modules, notifications, shortcuts, discord }
 }
 
 export interface AppInfo {

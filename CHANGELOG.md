@@ -9,6 +9,10 @@ com os grupos **Adicionado**, **Melhorado** e **Corrigido**.
 
 ## [Não lançado]
 
+### Adicionado
+- **Atalhos globais** (Configurações → Atalhos), funcionando com o U-Hub em segundo plano: mostrar/esconder o app, tocar/pausar, próxima e anterior (controlam o que estiver tocando — rádio ou Spotify) e volume da rádio. Grave qualquer combinação; o app avisa se ela já estiver em uso por outro programa.
+- **Status no Discord** (Configurações → Discord): mostra no seu perfil o jogo aberto, com capa e cronômetro da sessão, ou a rádio tocando ("Ouvindo U-Hub"). Opções para mostrar jogos, rádio, status ocioso e o botão "Baixar U-Hub". Usa o Discord desktop do computador, sem login, e reconecta sozinho quando o Discord é aberto.
+
 ## [0.4.0] - 2026-10-17
 
 ### Adicionado

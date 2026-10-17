@@ -68,6 +68,12 @@ function position(win: BrowserWindow, anchor: Rectangle): void {
   win.setBounds({ x, y, width: WIDTH, height: HEIGHT }, false)
 }
 
+const radioListeners = new Set<(s: RadioState) => void>()
+export const onRadioChange = (l: (s: RadioState) => void): void => void radioListeners.add(l)
+
+/** Last radio state published by the main window. */
+export const radioState = (): RadioState => radio
+
 export function hide(): void {
   if (popover?.isVisible()) {
     popover.hide()
@@ -102,6 +108,7 @@ export function registerPopoverIpc(getMain: () => BrowserWindow | null, showMain
   ipcMain.on('radio:publish', (_e, state: RadioState) => {
     radio = state
     popover?.webContents.send('radio:state', state)
+    radioListeners.forEach((l) => l(state))
   })
   ipcMain.handle('radio:get', () => radio)
   ipcMain.on('radio:command', (_e, cmd: RadioCommand) => getMain()?.webContents.send('radio:command', cmd))
