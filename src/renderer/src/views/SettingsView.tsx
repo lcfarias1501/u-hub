@@ -14,6 +14,7 @@ import {
   Palette,
   RefreshCw,
   SlidersHorizontal,
+  Sparkles,
   TriangleAlert
 } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
@@ -21,9 +22,11 @@ import type { AppInfo, AppSettings, BackupSummary, ModuleId, SpotifyStatus, Them
 import { Segmented, SettingRow, Switch } from '@renderer/components/Controls'
 import { Field } from '@renderer/components/Modal'
 import { Panel } from '@renderer/components/Panel'
+import { WhatsNew } from '@renderer/components/WhatsNew'
 import { MODULES } from '@renderer/components/nav'
 import logo from '@renderer/assets/logo.png'
 import { MOD_LABEL } from '@renderer/hooks/useHotkeys'
+import { CHANGELOG } from '@renderer/lib/changelog'
 import { useSettings } from '@renderer/lib/settings'
 import { THEME } from '@renderer/lib/theme'
 import { PageHeader } from './PageHeader'
@@ -312,6 +315,7 @@ function DataSection({ info }: { info: AppInfo | null }) {
 }
 
 function About({ info }: { info: AppInfo | null }) {
+  const [history, setHistory] = useState(false)
   const [check, setCheck] = useState<'idle' | 'checking' | 'dev' | 'latest' | 'available' | 'error'>('idle')
   const label = {
     idle: null,
@@ -332,9 +336,15 @@ function About({ info }: { info: AppInfo | null }) {
         </div>
         {label && <div className={`mt-1 font-mono text-[10px] ${check === 'error' ? 'text-rose-300' : check === 'available' ? 'text-volt-200' : 'text-zinc-500'}`}>{label}</div>}
       </div>
+      <button className="btn" onClick={() => setHistory(true)}>
+        <Sparkles className="size-3.5" /> Novidades
+      </button>
       <a className="btn" href="https://github.com/lcfarias1501/u-hub/releases" target="_blank" rel="noreferrer">
         <ExternalLink className="size-3.5" /> Releases
       </a>
+      {history && (
+        <WhatsNew entries={CHANGELOG.filter((e) => /^\d/.test(e.version))} title="Histórico de versões" onClose={() => setHistory(false)} />
+      )}
       <button
         className="btn"
         disabled={check === 'checking'}

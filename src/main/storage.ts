@@ -83,6 +83,7 @@ const store = new Store<StoreSchema & PrivateSchema>({
       { id: 'pcgamer', name: 'PC Gamer', url: 'https://www.pcgamer.com/rss/', enabled: false }
     ],
     notifications: [],
+    lastSeenVersion: null,
     radarCache: null,
     radarSeen: { free: [], news: [] },
     vaultBlob: null,
@@ -93,7 +94,7 @@ const store = new Store<StoreSchema & PrivateSchema>({
 })
 
 const PUBLIC_KEYS = new Set<StoreKey>([
-  'sidebarCollapsed', 'lastView', 'perfLayout', 'quests', 'launchers', 'stations', 'playlists', 'volume', 'vaultCategories', 'settings', 'manualGames', 'hiddenGames', 'playtime', 'wishlist', 'newsSources', 'notifications'
+  'sidebarCollapsed', 'lastView', 'perfLayout', 'quests', 'launchers', 'stations', 'playlists', 'volume', 'vaultCategories', 'settings', 'manualGames', 'hiddenGames', 'playtime', 'wishlist', 'newsSources', 'notifications', 'lastSeenVersion'
 ])
 
 /** Keys included in backups (everything user-authored except secrets and Spotify auth). */

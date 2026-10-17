@@ -2,10 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ViewId } from '@shared/types'
 import { Sidebar } from './components/Sidebar'
 import { TopBar } from './components/TopBar'
+import { WhatsNew } from './components/WhatsNew'
 import { navItems } from './components/nav'
 import { useModHotkeys } from './hooks/useHotkeys'
 import { usePersistentState } from './hooks/usePersistentState'
 import { SettingsProvider, useSettings } from './lib/settings'
+import { changesBetween, type ChangelogEntry } from './lib/changelog'
 import { startRadioBridge } from './lib/radioBridge'
 import { startSystemFeed } from './lib/systemFeed'
 import { LibraryView } from './views/LibraryView'
@@ -35,6 +37,18 @@ function Shell() {
   // The media view hosts the Spotify iframe; once opened it stays mounted so playback survives tab switches.
   const [mediaMounted, setMediaMounted] = useState(false)
   const booted = useRef(false)
+  const [news, setNews] = useState<ChangelogEntry[] | null>(null)
+
+  // "What's new" once after an update. A fresh install just records the version.
+  useEffect(() => {
+    void Promise.all([window.uhub.app.info(), window.uhub.store.get('lastSeenVersion')]).then(([info, seen]) => {
+      if (seen && seen !== info.version) {
+        const entries = changesBetween(seen, info.version)
+        if (entries.length) setNews(entries)
+      }
+      if (seen !== info.version) void window.uhub.store.set('lastSeenVersion', info.version)
+    })
+  }, [])
   const ready = settingsReady && viewReady && collapsedReady
 
   const setView = (v: ViewId): void => {
@@ -94,6 +108,7 @@ function Shell() {
           )}
         </main>
       </div>
+      {news && <WhatsNew entries={news} title="Novidades desde a última versão" onClose={() => setNews(null)} />}
     </div>
   )
 }

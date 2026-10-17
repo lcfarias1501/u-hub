@@ -1,7 +1,8 @@
 name: Release
 
-# Push a tag like `v0.2.0` to build installers for macOS, Windows and Linux
-# and publish them on the GitHub release page (also feeds the in-app updater).
+# Push a tag like `v0.4.0` to build installers for macOS, Windows and Linux,
+# publish them on the GitHub release page (also feeds the in-app updater) and
+# attach the matching CHANGELOG.md section as the release notes.
 on:
   push:
     tags: ['v*']
@@ -11,7 +12,31 @@ permissions:
   contents: write
 
 jobs:
+  # Fails fast — before any build minutes are spent — if the tag doesn't match
+  # package.json or CHANGELOG.md has no notes for this version.
+  notes:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: v
+        name: Check version and release notes
+        run: |
+          pkg=$(node -p "require('./package.json').version")
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "$tag" != "$pkg" ]; then
+            echo "::error::Tag v$tag doesn't match package.json version $pkg"; exit 1
+          fi
+          node scripts/release-notes.mjs "$pkg" > release-notes.md
+          echo "version=$pkg" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: release-notes.md
+
   build:
+    needs: notes
     strategy:
       fail-fast: false
       matrix:
@@ -38,3 +63,15 @@ jobs:
           MAIN_VITE_SPOTIFY_CLIENT_ID: ${{ vars.SPOTIFY_CLIENT_ID }}
           # No paid certificates: skip keychain lookup; mac uses ad-hoc signing from electron-builder.yml.
           CSC_IDENTITY_AUTO_DISCOVERY: false
+
+  publish-notes:
+    needs: [notes, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+      - name: Attach notes to the GitHub release
+        run: gh release edit "v${{ needs.notes.outputs.version }}" --repo "$GITHUB_REPOSITORY" --title "U-Hub v${{ needs.notes.outputs.version }}" --notes-file release-notes.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

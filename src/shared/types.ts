@@ -172,6 +172,8 @@ export interface StoreSchema {
   wishlist: WishlistItem[]
   newsSources: NewsSource[]
   notifications: AppNotification[]
+  /** Last app version whose "what's new" the user has seen. */
+  lastSeenVersion: string | null
   stations: RadioStation[]
   playlists: SpotifyPlaylist[]
   volume: number

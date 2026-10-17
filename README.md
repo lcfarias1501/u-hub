@@ -22,9 +22,15 @@ desenvolvimento do Spotify, que só aceita contas liberadas). Controlar o player
 
 ## Publicando uma versão
 
-1. Atualize `version` no `package.json` (ex.: `0.2.0`) e faça commit.
-2. `git tag v0.2.0 && git push origin main --tags`
-3. O GitHub Actions (`.github/workflows/release.yml`) gera os instaladores de Mac, Windows e Linux e publica no Release.
+Toda versão precisa de notas no [`CHANGELOG.md`](CHANGELOG.md) — o CI recusa a tag sem elas.
+
+1. Durante o desenvolvimento, registre cada mudança em `## [Não lançado]` (Adicionado / Melhorado / Corrigido).
+2. Para lançar: renomeie a seção para `## [0.4.0] - AAAA-MM-DD`, atualize `version` no `package.json` e faça commit.
+3. `git tag v0.4.0 && git push origin main --tags`
+4. O GitHub Actions (`.github/workflows/release.yml`) confere as notas, gera os instaladores de Mac, Windows e Linux,
+   publica no Release e usa a seção do changelog como texto da release. O app mostra as mesmas notas em "Novidades".
+
+Para conferir as notas de uma versão localmente: `node scripts/release-notes.mjs 0.4.0`
 
 Configuração única no GitHub: **Settings → Secrets and variables → Actions → Variables** → `SPOTIFY_CLIENT_ID`
 com o Client ID do seu app do Spotify. Para liberar um amigo: dashboard do Spotify → seu app → **User Management**.
