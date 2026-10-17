@@ -9,6 +9,8 @@ com os grupos **Adicionado**, **Melhorado** e **Corrigido**.
 
 ## [Não lançado]
 
+## [0.4.0] - 2026-10-17
+
 ### Adicionado
 - **Biblioteca de jogos**: detecta jogos instalados da Steam e da Epic, com capas oficiais, e permite adicionar qualquer jogo ou app manualmente.
 - **Tempo de jogo**: o U-Hub percebe quando um jogo está aberto (mesmo minimizado) e registra o tempo por dia; banner "Jogando agora" com cronômetro da sessão, estatísticas de hoje / 7 dias / jogo mais jogado e gráfico de atividade de 7 ou 30 dias.
