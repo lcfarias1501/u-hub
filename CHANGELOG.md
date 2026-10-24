@@ -9,6 +9,8 @@ com os grupos **Adicionado**, **Melhorado** e **Corrigido**.
 
 ## [Não lançado]
 
+## [0.6.0] - 2026-10-24
+
 ### Adicionado
 - **Apresentação do U-Hub** na primeira vez que o app é aberto: boas-vindas, perfil (opcional), escolha dos módulos que aparecem na barra lateral, cor de destaque com prévia ao vivo, conexões (Spotify, status no Discord, jogos detectados, região das lojas) e preferências do dia a dia (barra de menus, abrir com o sistema, notificações, atalhos). Dá para pular a qualquer momento e refazer em Configurações → Perfil.
 - **Perfil**: apelido e avatar (ícone + cor), mostrados no topo do app. Editável em Configurações → Perfil.
