@@ -73,7 +73,7 @@ const SYMBOLS: Record<string, string> = isMac
   ? { Command: '⌘', Control: '⌃', Alt: '⌥', Shift: '⇧', Up: '↑', Down: '↓', Left: '←', Right: '→', Space: 'Espaço' }
   : { Command: 'Win', Super: 'Win', Control: 'Ctrl', Alt: 'Alt', Shift: 'Shift', Up: '↑', Down: '↓', Left: '←', Right: '→', Space: 'Espaço' }
 
-function Keys({ accel }: { accel: string }) {
+export function Keys({ accel }: { accel: string }) {
   return (
     <span className="flex gap-0.5">
       {accel.split('+').map((k) => (

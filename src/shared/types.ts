@@ -239,6 +239,9 @@ export interface StoreSchema {
   notifications: AppNotification[]
   /** Last app version whose "what's new" the user has seen. */
   lastSeenVersion: string | null
+  profile: Profile | null
+  /** First-run presentation finished (or skipped). */
+  onboarded: boolean
   stations: RadioStation[]
   playlists: SpotifyPlaylist[]
   volume: number
@@ -331,6 +334,12 @@ export interface RadioState {
 }
 
 export type RadioCommand = { type: 'toggle' } | { type: 'next' } | { type: 'prev' } | { type: 'stop' } | { type: 'volume'; value: number }
+
+/** Local profile: shown in the app now, and the seed for the future online profile. */
+export interface Profile {
+  name: string
+  avatar: { icon: string; accent: Accent }
+}
 
 // ── Game library ─────────────────────────────────────────────────────────────
 

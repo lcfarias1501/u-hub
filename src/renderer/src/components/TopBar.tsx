@@ -7,6 +7,7 @@ import { Settings } from 'lucide-react'
 import { MOD_LABEL } from '@renderer/hooks/useHotkeys'
 import { navItemFor } from './nav'
 import { NotificationCenter } from './NotificationCenter'
+import { ProfileChip } from './ProfileChip'
 import { UpdateBadge } from './UpdateBadge'
 
 function Clock() {
@@ -53,6 +54,12 @@ export function TopBar({ view, onOpenSettings, onNavigate }: { view: ViewId; onO
           <Clock />
         </span>
         <NotificationCenter onNavigate={onNavigate} />
+        <ProfileChip
+          onOpen={() => {
+            onNavigate('settings')
+            setTimeout(() => document.getElementById('profile')?.scrollIntoView({ behavior: 'smooth' }), 150)
+          }}
+        />
         <button
           onClick={onOpenSettings}
           title={`Configurações (${MOD_LABEL},)`}

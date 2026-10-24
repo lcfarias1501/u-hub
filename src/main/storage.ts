@@ -43,6 +43,7 @@ interface PrivateSchema {
   radarCache: Omit<RadarSnapshot, 'refreshing' | 'errors'> | null
   /** Ids already announced, so each freebie/patch notifies once. */
   radarSeen: { free: string[]; news: string[] }
+  onboardingMigrated: boolean
   vaultBlob: string | null
   vaultMode: 'safe' | 'aes' | null
   spotifyClientId: string | null
@@ -84,8 +85,11 @@ const store = new Store<StoreSchema & PrivateSchema>({
     ],
     notifications: [],
     lastSeenVersion: null,
+    profile: null,
+    onboarded: false,
     radarCache: null,
     radarSeen: { free: [], news: [] },
+    onboardingMigrated: false,
     vaultBlob: null,
     vaultMode: null,
     spotifyClientId: null,
@@ -93,8 +97,16 @@ const store = new Store<StoreSchema & PrivateSchema>({
   }
 })
 
+// People upgrading from a version without onboarding already set the app up:
+// a recorded lastSeenVersion means "not a fresh install", so skip the tour for them.
+// Runs once per install: on a fresh install lastSeenVersion is still null at this point.
+if (!store.get('onboardingMigrated')) {
+  if (store.get('lastSeenVersion')) store.set('onboarded', true)
+  store.set('onboardingMigrated', true)
+}
+
 const PUBLIC_KEYS = new Set<StoreKey>([
-  'sidebarCollapsed', 'lastView', 'perfLayout', 'quests', 'launchers', 'stations', 'playlists', 'volume', 'vaultCategories', 'settings', 'manualGames', 'hiddenGames', 'playtime', 'wishlist', 'newsSources', 'notifications', 'lastSeenVersion'
+  'sidebarCollapsed', 'lastView', 'perfLayout', 'quests', 'launchers', 'stations', 'playlists', 'volume', 'vaultCategories', 'settings', 'manualGames', 'hiddenGames', 'playtime', 'wishlist', 'newsSources', 'notifications', 'lastSeenVersion', 'profile', 'onboarded'
 ])
 
 /** Keys included in backups (everything user-authored except secrets and Spotify auth). */

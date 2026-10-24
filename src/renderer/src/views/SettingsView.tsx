@@ -18,37 +18,32 @@ import {
   RefreshCw,
   SlidersHorizontal,
   Sparkles,
-  TriangleAlert
+  TriangleAlert,
+  UserRound,
+  Wand2
 } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { AppInfo, AppSettings, BackupSummary, ModuleId, NotificationKind, SpotifyStatus, ThemeAccent } from '@shared/types'
 import { Segmented, SettingRow, Switch } from '@renderer/components/Controls'
 import { Field } from '@renderer/components/Modal'
 import { Panel } from '@renderer/components/Panel'
+import { AccentPicker, IconPicker } from '@renderer/components/Pickers'
+import { ACCENTS } from '@renderer/lib/accents'
+import { iconFor } from '@renderer/lib/icons'
+import { usePersistentState } from '@renderer/hooks/usePersistentState'
 import { WhatsNew } from '@renderer/components/WhatsNew'
 import { MODULES } from '@renderer/components/nav'
 import logo from '@renderer/assets/logo.png'
 import { MOD_LABEL } from '@renderer/hooks/useHotkeys'
 import { CHANGELOG } from '@renderer/lib/changelog'
+import { REGIONS } from '@renderer/lib/regions'
 import { useSettings } from '@renderer/lib/settings'
 import { THEME } from '@renderer/lib/theme'
 import { PageHeader } from './PageHeader'
 import { DiscordSection, ShortcutsSection } from './settings/ShortcutsDiscord'
 
-const REGIONS: Record<string, string> = {
-  BR: 'Brasil',
-  PT: 'Portugal',
-  US: 'Estados Unidos',
-  GB: 'Reino Unido',
-  ES: 'Espanha',
-  FR: 'França',
-  DE: 'Alemanha',
-  AR: 'Argentina',
-  MX: 'México',
-  CA: 'Canadá'
-}
-
 const SECTIONS = [
+  { id: 'profile', label: 'Perfil', icon: UserRound },
   { id: 'modules', label: 'Módulos', icon: LayoutGrid },
   { id: 'general', label: 'Geral', icon: SlidersHorizontal },
   { id: 'appearance', label: 'Aparência', icon: Palette },
@@ -104,6 +99,7 @@ export function SettingsView() {
         </nav>
 
         <div className="max-w-3xl space-y-5 pb-24">
+          <ProfileSection />
           <ModulesSection />
           <GeneralSection info={info} />
           <AppearanceSection />
@@ -124,6 +120,34 @@ function Section({ id, title, icon, children }: { id: string; title: string; ico
         {children}
       </Panel>
     </div>
+  )
+}
+
+// ── Profile ──────────────────────────────────────────────────────────────────
+
+function ProfileSection() {
+  const [profile, setProfile] = usePersistentState('profile', null)
+  const p = profile ?? { name: '', avatar: { icon: 'gamepad', accent: 'violet' as const } }
+  const Icon = iconFor(p.avatar.icon)
+  const save = (next: typeof p): void => setProfile(next.name.trim() ? next : { ...next, name: '' })
+  return (
+    <Section id="profile" title="Perfil" icon={<UserRound />}>
+      <div className="flex items-start gap-5 py-4">
+        <span className={`grid size-16 shrink-0 place-items-center rounded-full border-2 ${ACCENTS[p.avatar.accent].tone}`}>
+          <Icon className="size-7" />
+        </span>
+        <div className="min-w-0 flex-1 space-y-3">
+          <input className="field h-10 max-w-xs text-[14px]" maxLength={24} placeholder="Seu apelido" value={p.name} onChange={(e) => save({ ...p, name: e.target.value })} />
+          <IconPicker value={p.avatar.icon} onChange={(icon) => save({ ...p, avatar: { ...p.avatar, icon } })} />
+          <AccentPicker value={p.avatar.accent} onChange={(accent) => save({ ...p, avatar: { ...p.avatar, accent } })} />
+        </div>
+      </div>
+      <SettingRow title="Apresentação do U-Hub" description="Mostra de novo o passo a passo inicial (módulos, visual, conexões).">
+        <button className="btn" onClick={() => void window.uhub.store.set('onboarded', false)}>
+          <Wand2 className="size-3.5" /> Refazer apresentação
+        </button>
+      </SettingRow>
+    </Section>
   )
 }
 

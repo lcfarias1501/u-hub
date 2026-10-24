@@ -3,6 +3,7 @@ import type { ViewId } from '@shared/types'
 import { Sidebar } from './components/Sidebar'
 import { TopBar } from './components/TopBar'
 import { WhatsNew } from './components/WhatsNew'
+import { Onboarding } from './views/Onboarding'
 import { navItems } from './components/nav'
 import { useModHotkeys } from './hooks/useHotkeys'
 import { usePersistentState } from './hooks/usePersistentState'
@@ -33,6 +34,7 @@ function Shell() {
   const { settings, modules, ready: settingsReady } = useSettings()
   const [lastView, setLastView, viewReady] = usePersistentState('lastView', 'performance')
   const [collapsed, setCollapsed, collapsedReady] = usePersistentState('sidebarCollapsed', false)
+  const [onboarded, , onboardedReady] = usePersistentState('onboarded', true)
   const [view, setViewState] = useState<ViewId | null>(null)
   // The media view hosts the Spotify iframe; once opened it stays mounted so playback survives tab switches.
   const [mediaMounted, setMediaMounted] = useState(false)
@@ -87,7 +89,9 @@ function Shell() {
     ...Object.fromEntries(items.filter((n) => n.key).map((n) => [n.key!, () => setView(n.id)]))
   })
 
-  if (!view) return <div className="hub-backdrop h-full" />
+  if (!view || !onboardedReady) return <div className="hub-backdrop h-full" />
+  // First run: the presentation replaces the whole UI until it's finished or skipped.
+  if (!onboarded) return <Onboarding onFinish={(first) => setView(first)} />
 
   return (
     <div className="hub-backdrop flex h-full flex-col">
