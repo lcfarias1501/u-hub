@@ -7,6 +7,7 @@ import { applyShortcuts, initShortcuts, pauseShortcuts, shortcutStatus } from '.
 import { launchGame, onLibraryChange, revealGame, scan as scanLibrary, snapshot as librarySnapshot, startLibrary, suggestName } from './games'
 import { initNotifications } from './notifications'
 import { registerPopoverIpc } from './popover'
+import * as social from './social'
 import { radarSnapshot, refreshRadar, searchSteam, startRadar } from './radar'
 import { launch } from './launcher'
 import { applySettings, canOpenAtLogin, quitting, showWindow } from './shellIntegration'
@@ -196,6 +197,15 @@ function registerIpc(): void {
   ipcMain.handle('shortcuts:pause', (_e, pause: boolean) => pauseShortcuts(!!pause))
   ipcMain.handle('discord:status', () => discordStatus())
 
+  ipcMain.handle('social:get', () => social.socialState())
+  ipcMain.handle('social:signIn', () => social.signIn())
+  ipcMain.handle('social:signOut', () => social.signOut())
+  ipcMain.handle('social:addFriend', (_e, target: string) => social.addFriend(String(target)))
+  ipcMain.handle('social:respond', (_e, id: string, accept: boolean) => social.respondRequest(String(id), !!accept))
+  ipcMain.handle('social:cancel', (_e, id: string) => social.cancelRequest(String(id)))
+  ipcMain.handle('social:remove', (_e, id: string) => social.removeFriend(String(id)))
+  ipcMain.handle('social:updateProfile', (_e, patch: Parameters<typeof social.updateProfile>[0]) => social.updateProfile(patch))
+
   ipcMain.handle('radar:get', () => radarSnapshot())
   ipcMain.handle('radar:refresh', () => refreshRadar())
   ipcMain.handle('radar:search', (_e, term: string) => searchSteam(String(term)))
@@ -229,6 +239,7 @@ app.whenReady().then(() => {
     win?.webContents.send('shortcuts:status', applyShortcuts(s.shortcuts))
   })
   startDiscord(() => win)
+  social.startSocial(() => win)
   onLibraryChange((s) => win?.webContents.send('library:update', s))
   applySettings(getSettings(), () => win)
   onSettingsChange((s) => applySettings(s, () => win))
@@ -236,7 +247,10 @@ app.whenReady().then(() => {
 })
 
 // Leave no stale status on the user's Discord profile.
-app.on('before-quit', () => stopDiscord())
+app.on('before-quit', () => {
+  stopDiscord()
+  void social.stopSocial()
+})
 app.on('will-quit', () => globalShortcut.unregisterAll())
 
 app.on('window-all-closed', () => {

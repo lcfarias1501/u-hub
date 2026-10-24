@@ -9,6 +9,9 @@ import type {
   SteamSearchResult,
   DiscordStatus,
   ShortcutStatus,
+  Accent,
+  FriendRequestResult,
+  SocialState,
   ModuleId,
   RadioCommand,
   RadioState,
@@ -118,6 +121,22 @@ const api = {
     export: (password: string | null): Promise<{ ok: boolean; path?: string }> => ipcRenderer.invoke('backup:export', password),
     inspect: (): Promise<BackupSummary | null> => ipcRenderer.invoke('backup:inspect'),
     restore: (password: string | null): Promise<void> => ipcRenderer.invoke('backup:restore', password)
+  },
+  social: {
+    get: (): Promise<SocialState> => ipcRenderer.invoke('social:get'),
+    signIn: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('social:signIn'),
+    signOut: (): Promise<void> => ipcRenderer.invoke('social:signOut'),
+    addFriend: (target: string): Promise<{ result?: FriendRequestResult; error?: string }> => ipcRenderer.invoke('social:addFriend', target),
+    respond: (id: string, accept: boolean): Promise<{ error?: string }> => ipcRenderer.invoke('social:respond', id, accept),
+    cancel: (id: string): Promise<{ error?: string }> => ipcRenderer.invoke('social:cancel', id),
+    remove: (friendId: string): Promise<{ error?: string }> => ipcRenderer.invoke('social:remove', friendId),
+    updateProfile: (patch: { username?: string; displayName?: string; avatarIcon?: string; avatarAccent?: Accent }): Promise<{ error?: string }> =>
+      ipcRenderer.invoke('social:updateProfile', patch),
+    onUpdate: (cb: (s: SocialState) => void): (() => void) => {
+      const listener = (_: unknown, s: SocialState): void => cb(s)
+      ipcRenderer.on('social:update', listener)
+      return () => ipcRenderer.off('social:update', listener)
+    }
   },
   shortcuts: {
     status: (): Promise<ShortcutStatus> => ipcRenderer.invoke('shortcuts:status'),

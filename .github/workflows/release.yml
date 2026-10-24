@@ -63,6 +63,9 @@ jobs:
           MAIN_VITE_SPOTIFY_CLIENT_ID: ${{ vars.SPOTIFY_CLIENT_ID }}
           # Discord Application ID for Rich Presence (same place).
           MAIN_VITE_DISCORD_CLIENT_ID: ${{ vars.DISCORD_CLIENT_ID }}
+          # Supabase project for profiles/friends (public URL + anon key; access is enforced by RLS).
+          MAIN_VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          MAIN_VITE_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
           # No paid certificates: skip keychain lookup; mac uses ad-hoc signing from electron-builder.yml.
           CSC_IDENTITY_AUTO_DISCOVERY: false
 

@@ -44,6 +44,8 @@ interface PrivateSchema {
   /** Ids already announced, so each freebie/patch notifies once. */
   radarSeen: { free: string[]; news: string[] }
   onboardingMigrated: boolean
+  /** Supabase auth session (and PKCE verifier), sealed like the vault. */
+  supabaseAuth: Sealed | null
   vaultBlob: string | null
   vaultMode: 'safe' | 'aes' | null
   spotifyClientId: string | null
@@ -90,6 +92,7 @@ const store = new Store<StoreSchema & PrivateSchema>({
     radarCache: null,
     radarSeen: { free: [], news: [] },
     onboardingMigrated: false,
+    supabaseAuth: null,
     vaultBlob: null,
     vaultMode: null,
     spotifyClientId: null,
@@ -238,6 +241,21 @@ export function readSpotifyAuth<T>(): T | null {
   } catch {
     return null
   }
+}
+
+/** Generic sealed key/value bag (used as the Supabase auth storage). */
+export function readSealedMap(key: 'supabaseAuth'): Record<string, string> {
+  const sealed = store.get(key)
+  if (!sealed) return {}
+  try {
+    return JSON.parse(decrypt(sealed.blob, sealed.mode)) as Record<string, string>
+  } catch {
+    return {}
+  }
+}
+
+export function writeSealedMap(key: 'supabaseAuth', value: Record<string, string>): void {
+  store.set(key, Object.keys(value).length ? encrypt(JSON.stringify(value)) : null)
 }
 
 export function writeSpotifyAuth(auth: unknown): void {

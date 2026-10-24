@@ -9,6 +9,13 @@ com os grupos **Adicionado**, **Melhorado** e **Corrigido**.
 
 ## [Não lançado]
 
+### Adicionado
+- **Amigos**: entre com o Discord e tenha um perfil online (nome, @usuário e avatar), com um código de amigo para compartilhar.
+  - Adicione amigos por @usuário ou código; aceite, recuse ou cancele pedidos.
+  - Lista de amigos com status em tempo real: jogando (jogo, capa e há quanto tempo), online, ausente ou offline, e a rádio que cada um está ouvindo.
+  - Privacidade: escolha se mostra o jogo e a música, ou fique invisível. Só seus amigos podem ver seu status.
+  - Notificações de pedidos de amizade, novas amizades e quando um amigo começa a jogar (Configurações → Notificações → Amigos).
+
 ## [0.6.0] - 2026-10-24
 
 ### Adicionado

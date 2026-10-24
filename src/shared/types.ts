@@ -81,7 +81,7 @@ export interface SpotifyPlaylist {
   uri: string
 }
 
-export type ModuleId = 'performance' | 'library' | 'radar' | 'vault' | 'media' | 'quests'
+export type ModuleId = 'performance' | 'library' | 'radar' | 'friends' | 'vault' | 'media' | 'quests'
 export type ViewId = ModuleId | 'settings'
 
 /** App-wide accent (the "volt" colour). A subset of Accent that reads well as a primary. */
@@ -107,6 +107,7 @@ export interface AppSettings {
   /** Electron accelerators ('' = unassigned). Global: they work while U-Hub is in the background. */
   shortcuts: Record<ShortcutAction, string>
   discord: DiscordSettings
+  social: SocialSettings
 }
 
 export type ShortcutAction = 'toggleWindow' | 'mediaPlayPause' | 'mediaNext' | 'mediaPrev' | 'radioVolumeUp' | 'radioVolumeDown'
@@ -150,6 +151,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     { id: 'performance', visible: true },
     { id: 'library', visible: true },
     { id: 'radar', visible: true },
+    { id: 'friends', visible: true },
     { id: 'vault', visible: true },
     { id: 'media', visible: true },
     { id: 'quests', visible: true }
@@ -164,7 +166,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   sidebarMode: 'remember',
   zoom: 1,
   notifications: {
-    system: { free: true, price: true, patch: true, game: false, system: true },
+    system: { free: true, price: true, patch: true, game: false, social: true, system: true },
     quietWhilePlaying: true,
     sound: true,
     badge: true
@@ -178,7 +180,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
     radioVolumeUp: '',
     radioVolumeDown: ''
   },
-  discord: { enabled: true, clientId: null, showGames: true, showRadio: true, showIdle: false, showButton: true }
+  discord: { enabled: true, clientId: null, showGames: true, showRadio: true, showIdle: false, showButton: true },
+  social: { shareGame: true, shareMusic: true, invisible: false }
 }
 
 /**
@@ -200,7 +203,8 @@ export function normalizeSettings(stored: Partial<AppSettings> | null | undefine
   }
   const shortcuts = { ...DEFAULT_SETTINGS.shortcuts, ...stored?.shortcuts }
   const discord = { ...DEFAULT_SETTINGS.discord, ...stored?.discord }
-  return { ...s, modules, notifications, shortcuts, discord }
+  const social = { ...DEFAULT_SETTINGS.social, ...stored?.social }
+  return { ...s, modules, notifications, shortcuts, discord, social }
 }
 
 export interface AppInfo {
@@ -477,7 +481,7 @@ export interface RadarSnapshot {
 
 // ── Notifications ────────────────────────────────────────────────────────────
 
-export type NotificationKind = 'free' | 'price' | 'patch' | 'game' | 'system'
+export type NotificationKind = 'free' | 'price' | 'patch' | 'game' | 'social' | 'system'
 
 export interface AppNotification {
   id: string
@@ -490,4 +494,63 @@ export interface AppNotification {
   image?: string | null
   /** View to open when clicked inside the app. */
   view?: ViewId
+}
+
+// ── Social (Supabase) ────────────────────────────────────────────────────────
+
+export interface SocialProfile {
+  id: string
+  username: string
+  displayName: string
+  avatarIcon: string
+  avatarAccent: Accent
+  discordAvatar: string | null
+  friendCode: string
+}
+
+export type PresenceStatus = 'online' | 'away' | 'playing'
+
+/** What a user broadcasts on their private presence channel. */
+export interface Presence {
+  status: PresenceStatus
+  game?: { name: string; cover: string | null; since: number }
+  music?: { title: string; subtitle: string }
+  at: number
+}
+
+export interface Friend {
+  profile: SocialProfile
+  since: string
+  /** null = offline (not connected, or invisible). */
+  presence: Presence | null
+}
+
+export interface FriendRequest {
+  id: string
+  incoming: boolean
+  profile: SocialProfile
+  createdAt: string
+}
+
+export interface SocialState {
+  /** False when this build has no Supabase project configured. */
+  configured: boolean
+  signedIn: boolean
+  loading: boolean
+  me: SocialProfile | null
+  myPresence: Presence | null
+  friends: Friend[]
+  requests: FriendRequest[]
+  error: string | null
+}
+
+export type FriendRequestResult = 'sent' | 'accepted' | 'already_friends' | 'already_sent' | 'not_found' | 'self'
+
+export interface SocialSettings {
+  /** Share the game you're playing with friends. */
+  shareGame: boolean
+  /** Share the radio station you're listening to. */
+  shareMusic: boolean
+  /** Appear offline to everyone. */
+  invisible: boolean
 }

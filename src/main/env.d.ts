@@ -16,3 +16,8 @@ declare module '*?asset' {
 interface ImportMetaEnv {
   readonly MAIN_VITE_DISCORD_CLIENT_ID?: string
 }
+
+interface ImportMetaEnv {
+  readonly MAIN_VITE_SUPABASE_URL?: string
+  readonly MAIN_VITE_SUPABASE_ANON_KEY?: string
+}

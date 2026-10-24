@@ -9,6 +9,7 @@ const MODULE_LABELS: Record<ModuleId, string> = {
   performance: 'Performance',
   library: 'Biblioteca',
   radar: 'Ofertas & Notícias',
+  friends: 'Amigos',
   vault: 'Vault & Keys',
   media: 'Media & Audio',
   quests: 'Quest Log'

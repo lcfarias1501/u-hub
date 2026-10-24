@@ -11,6 +11,7 @@ import { SettingsProvider, useSettings } from './lib/settings'
 import { changesBetween, type ChangelogEntry } from './lib/changelog'
 import { startRadioBridge } from './lib/radioBridge'
 import { startSystemFeed } from './lib/systemFeed'
+import { FriendsView } from './views/FriendsView'
 import { LibraryView } from './views/LibraryView'
 import { MediaView } from './views/MediaView'
 import { PerformanceView } from './views/PerformanceView'
@@ -102,6 +103,7 @@ function Shell() {
           {view === 'performance' && <PerformanceView />}
           {view === 'library' && <LibraryView />}
           {view === 'radar' && <RadarView />}
+          {view === 'friends' && <FriendsView />}
           {view === 'vault' && <VaultView />}
           {view === 'quests' && <QuestView />}
           {view === 'settings' && <SettingsView />}
