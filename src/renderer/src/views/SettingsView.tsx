@@ -3,6 +3,7 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities'
 import {
   Archive,
+  Cloud,
   Bell,
   Keyboard,
   MessageSquare,
@@ -40,9 +41,11 @@ import { REGIONS } from '@renderer/lib/regions'
 import { useSettings } from '@renderer/lib/settings'
 import { THEME } from '@renderer/lib/theme'
 import { PageHeader } from './PageHeader'
+import { AccountSection } from './settings/AccountSection'
 import { DiscordSection, ShortcutsSection } from './settings/ShortcutsDiscord'
 
 const SECTIONS = [
+  { id: 'account', label: 'Conta', icon: Cloud },
   { id: 'profile', label: 'Perfil', icon: UserRound },
   { id: 'modules', label: 'Módulos', icon: LayoutGrid },
   { id: 'general', label: 'Geral', icon: SlidersHorizontal },
@@ -99,6 +102,7 @@ export function SettingsView() {
         </nav>
 
         <div className="max-w-3xl space-y-5 pb-24">
+          <AccountSection />
           <ProfileSection />
           <ModulesSection />
           <GeneralSection info={info} />

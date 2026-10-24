@@ -45,7 +45,10 @@ let state: SocialState = {
   myPresence: null,
   friends: [],
   requests: [],
-  error: null
+  error: null,
+  account: null,
+  pendingEmail: null,
+  recovery: false
 }
 let getWin: () => BrowserWindow | null = () => null
 let userId: string | null = null
@@ -54,6 +57,11 @@ const friendChannels = new Map<string, RealtimeChannel>()
 const presences = new Map<string, Presence | null>()
 
 export const socialState = (): SocialState => state
+
+/** For other main modules (settings sync) that need the authenticated client. */
+export const supabaseClient = (): SupabaseClient | null => client
+const accountListeners = new Set<(userId: string | null) => void>()
+export const onAccountChange = (l: (userId: string | null) => void): void => void accountListeners.add(l)
 
 function set(patch: Partial<SocialState>): void {
   state = { ...state, ...patch }
@@ -232,8 +240,10 @@ async function start(session: Session): Promise<void> {
     .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'friendships' }, () => void loadLists())
     .subscribe()
 
+  await refreshAccount()
   await loadLists()
   await adoptLocalProfile()
+  accountListeners.forEach((l) => l(userId))
 }
 
 async function stop(): Promise<void> {
@@ -243,8 +253,9 @@ async function stop(): Promise<void> {
   presences.clear()
   myChannel = null
   userId = null
+  accountListeners.forEach((l) => l(null))
   lastTracked = ''
-  set({ signedIn: false, loading: false, me: null, myPresence: null, friends: [], requests: [] })
+  set({ signedIn: false, loading: false, me: null, myPresence: null, friends: [], requests: [], account: null, recovery: false })
 }
 
 /** First online sign-in: carry over the avatar/name chosen locally (onboarding or Settings). */
@@ -259,13 +270,24 @@ async function adoptLocalProfile(): Promise<void> {
 
 // ── Public API ───────────────────────────────────────────────────────────────
 
-let loginServer: Server | null = null
+// ── Browser round-trips (OAuth, email links) ─────────────────────────────────
 
-/** Discord OAuth (PKCE) in the browser, landing on a one-shot loopback server. */
-export function signIn(): Promise<{ ok: boolean; error?: string }> {
-  if (!client) return Promise.resolve({ ok: false, error: 'Este build não tem o servidor de amigos configurado.' })
-  loginServer?.close()
-  loginServer?.closeAllConnections()
+let callbackServer: Server | null = null
+
+const page = (title: string, body: string): string =>
+  `<!doctype html><meta charset="utf-8"><title>U-Hub</title><body style="margin:0;height:100vh;display:grid;place-items:center;background:#0F0F12;color:#e4e4e7;font:15px ui-monospace,Menlo,monospace"><div style="text-align:center"><div style="color:#8B5CF6;letter-spacing:.3em;font-size:11px">U-HUB // CONTA</div><h1 style="font:600 22px system-ui;margin:12px 0">${title}</h1><p style="color:#71717a">${body}</p></div>`
+
+/**
+ * Listens on the loopback redirect URL for one PKCE `?code=` and exchanges it
+ * for a session. `open` returns the URL to send the browser to (OAuth); for
+ * email links (confirmation, password reset) there's nothing to open — we just
+ * wait for the user to click the link in their inbox.
+ */
+function awaitCallback(timeoutMs: number, open?: () => Promise<{ url?: string; error?: string }>): Promise<{ ok: boolean; error?: string }> {
+  if (!client) return Promise.resolve({ ok: false, error: 'Não configurado' })
+  const supabase = client
+  callbackServer?.close()
+  callbackServer?.closeAllConnections()
 
   return new Promise((resolve) => {
     let done = false
@@ -275,12 +297,9 @@ export function signIn(): Promise<{ ok: boolean; error?: string }> {
       clearTimeout(timer)
       server.close()
       server.closeAllConnections()
-      loginServer = null
+      if (callbackServer === server) callbackServer = null
       resolve(r)
     }
-    const page = (title: string, body: string): string =>
-      `<!doctype html><meta charset="utf-8"><title>U-Hub</title><body style="margin:0;height:100vh;display:grid;place-items:center;background:#0F0F12;color:#e4e4e7;font:15px ui-monospace,Menlo,monospace"><div style="text-align:center"><div style="color:#8B5CF6;letter-spacing:.3em;font-size:11px">U-HUB // AMIGOS</div><h1 style="font:600 22px system-ui;margin:12px 0">${title}</h1><p style="color:#71717a">${body}</p></div>`
-
     const server = createServer(async (req, res) => {
       const url = new URL(req.url ?? '/', REDIRECT)
       if (url.pathname !== '/auth/callback') return void res.writeHead(404).end()
@@ -288,29 +307,123 @@ export function signIn(): Promise<{ ok: boolean; error?: string }> {
       const code = url.searchParams.get('code')
       const err = url.searchParams.get('error_description') ?? url.searchParams.get('error')
       if (!code) {
-        res.end(page('Login cancelado', 'Você pode fechar esta aba e tentar de novo no U-Hub.'))
-        return finish({ ok: false, error: err ?? 'Login cancelado' })
+        res.end(page('Não deu certo', err ? decodeURIComponent(err) : 'Você pode fechar esta aba e tentar de novo no U-Hub.'))
+        return finish({ ok: false, error: err ?? 'Cancelado' })
       }
-      const { error } = await client.auth.exchangeCodeForSession(code)
+      const { error } = await supabase.auth.exchangeCodeForSession(code)
       if (error) {
         res.end(page('Falha ao entrar', error.message))
-        return finish({ ok: false, error: error.message })
+        return finish({ ok: false, error: ptError(error.message) })
       }
       res.end(page('Pronto! ✓', 'Pode fechar esta aba e voltar para o U-Hub.'))
       finish({ ok: true })
     })
-    loginServer = server
-    const timer = setTimeout(() => finish({ ok: false, error: 'Tempo de login esgotado' }), LOGIN_TIMEOUT_MS)
+    callbackServer = server
+    const timer = setTimeout(() => finish({ ok: false, error: 'Tempo esgotado' }), timeoutMs)
     server.once('error', (e: NodeJS.ErrnoException) => finish({ ok: false, error: e.code === 'EADDRINUSE' ? 'Porta 43822 ocupada' : e.message }))
     server.listen(43822, '127.0.0.1', async () => {
-      const { data, error } = await client.auth.signInWithOAuth({
-        provider: 'discord',
-        options: { redirectTo: REDIRECT, skipBrowserRedirect: true, scopes: 'identify' }
-      })
-      if (error || !data.url) return finish({ ok: false, error: error?.message ?? 'Não foi possível iniciar o login' })
-      void shell.openExternal(data.url)
+      if (!open) return
+      const r = await open()
+      if (r.error || !r.url) return finish({ ok: false, error: r.error ?? 'Não foi possível abrir o navegador' })
+      void shell.openExternal(r.url)
     })
   })
+}
+
+/** Supabase auth messages → Portuguese, for the ones users actually hit. */
+function ptError(msg: string): string {
+  const m = msg.toLowerCase()
+  if (m.includes('invalid login credentials')) return 'E-mail ou senha incorretos.'
+  if (m.includes('email not confirmed')) return 'Confirme seu e-mail antes de entrar (veja sua caixa de entrada).'
+  if (m.includes('user already registered')) return 'Já existe uma conta com esse e-mail. Tente entrar.'
+  if (m.includes('password should be at least')) return 'A senha precisa ter pelo menos 6 caracteres.'
+  if (m.includes('unable to validate email') || m.includes('invalid format')) return 'E-mail inválido.'
+  if (m.includes('rate limit') || m.includes('security purposes')) return 'Muitas tentativas. Espere um pouco e tente de novo.'
+  if (m.includes('provider is not enabled') || m.includes('unsupported provider')) return 'O login com Discord ainda não foi ativado no servidor.'
+  if (m.includes('manual linking is disabled')) return 'A vinculação de contas está desativada no servidor.'
+  if (m.includes('identity is already linked')) return 'Esse Discord já está vinculado a outra conta U-Hub.'
+  return msg
+}
+
+// ── Public API: accounts ─────────────────────────────────────────────────────
+
+const LINK_TIMEOUT_MS = 30 * 60_000
+
+export function signInDiscord(): Promise<{ ok: boolean; error?: string }> {
+  if (!client) return Promise.resolve({ ok: false, error: 'Não configurado' })
+  const supabase = client
+  return awaitCallback(LOGIN_TIMEOUT_MS, async () => {
+    const { data, error } = await supabase.auth.signInWithOAuth({ provider: 'discord', options: { redirectTo: REDIRECT, skipBrowserRedirect: true, scopes: 'identify' } })
+    return { url: data?.url ?? undefined, error: error ? ptError(error.message) : undefined }
+  })
+}
+
+/** Attach Discord to the signed-in account (needs "manual linking" enabled in Supabase). */
+export function linkDiscord(): Promise<{ ok: boolean; error?: string }> {
+  if (!client) return Promise.resolve({ ok: false, error: 'Não configurado' })
+  const supabase = client
+  return awaitCallback(LOGIN_TIMEOUT_MS, async () => {
+    const { data, error } = await supabase.auth.linkIdentity({ provider: 'discord', options: { redirectTo: REDIRECT, skipBrowserRedirect: true, scopes: 'identify' } })
+    return { url: data?.url ?? undefined, error: error ? ptError(error.message) : undefined }
+  }).then(async (r) => {
+    await refreshAccount()
+    return r
+  })
+}
+
+/** null = couldn't check (offline, or the 0002 migration isn't applied); the sign-up trigger still guarantees uniqueness. */
+export async function usernameAvailable(name: string): Promise<boolean | null> {
+  if (!client) return null
+  const { data, error } = await client.rpc('username_available', { name })
+  return error ? null : data === true
+}
+
+export async function signUpEmail(form: { email: string; password: string; username: string; displayName: string }): Promise<{ ok: boolean; needsConfirmation?: boolean; error?: string }> {
+  if (!client) return { ok: false, error: 'Não configurado' }
+  const username = form.username.trim().toLowerCase()
+  if (!/^[a-z0-9_]{3,20}$/.test(username)) return { ok: false, error: 'Usuário: 3 a 20 caracteres, letras minúsculas, números ou _' }
+  if ((await usernameAvailable(username)) === false) return { ok: false, error: 'Esse nome de usuário já está em uso.' }
+  const { data, error } = await client.auth.signUp({
+    email: form.email.trim(),
+    password: form.password,
+    options: { emailRedirectTo: REDIRECT, data: { username, display_name: form.displayName.trim() || username } }
+  })
+  if (error) return { ok: false, error: ptError(error.message) }
+  if (data.session) return { ok: true }
+  // Email confirmation is on: keep listening so clicking the link signs the app in.
+  set({ pendingEmail: form.email.trim() })
+  void awaitCallback(LINK_TIMEOUT_MS).then(() => set({ pendingEmail: null }))
+  return { ok: true, needsConfirmation: true }
+}
+
+export async function signInEmail(email: string, password: string): Promise<{ ok: boolean; error?: string }> {
+  if (!client) return { ok: false, error: 'Não configurado' }
+  const { error } = await client.auth.signInWithPassword({ email: email.trim(), password })
+  return error ? { ok: false, error: ptError(error.message) } : { ok: true }
+}
+
+/** Sends a reset link; clicking it signs the app in and asks for a new password. */
+export async function resetPassword(email: string): Promise<{ ok: boolean; error?: string }> {
+  if (!client) return { ok: false, error: 'Não configurado' }
+  const { error } = await client.auth.resetPasswordForEmail(email.trim(), { redirectTo: REDIRECT })
+  if (error) return { ok: false, error: ptError(error.message) }
+  void awaitCallback(LINK_TIMEOUT_MS).then((r) => r.ok && set({ recovery: true }))
+  return { ok: true }
+}
+
+export async function setPassword(password: string): Promise<{ ok: boolean; error?: string }> {
+  if (!client) return { ok: false, error: 'Não configurado' }
+  const { error } = await client.auth.updateUser({ password })
+  if (error) return { ok: false, error: ptError(error.message) }
+  set({ recovery: false })
+  return { ok: true }
+}
+
+async function refreshAccount(): Promise<void> {
+  if (!client) return
+  const { data } = await client.auth.getUser()
+  const u = data.user
+  set({ account: u ? { email: u.email ?? null, providers: (u.identities ?? []).map((i) => i.provider) } : null })
 }
 
 export async function signOut(): Promise<void> {

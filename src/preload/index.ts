@@ -12,6 +12,7 @@ import type {
   Accent,
   FriendRequestResult,
   SocialState,
+  SyncStatus,
   ModuleId,
   RadioCommand,
   RadioState,
@@ -122,9 +123,26 @@ const api = {
     inspect: (): Promise<BackupSummary | null> => ipcRenderer.invoke('backup:inspect'),
     restore: (password: string | null): Promise<void> => ipcRenderer.invoke('backup:restore', password)
   },
+  sync: {
+    status: (): Promise<SyncStatus> => ipcRenderer.invoke('sync:status'),
+    resolve: (keep: 'cloud' | 'local'): Promise<void> => ipcRenderer.invoke('sync:resolve', keep),
+    now: (): Promise<void> => ipcRenderer.invoke('sync:now'),
+    onUpdate: (cb: (s: SyncStatus) => void): (() => void) => {
+      const listener = (_: unknown, s: SyncStatus): void => cb(s)
+      ipcRenderer.on('sync:update', listener)
+      return () => ipcRenderer.off('sync:update', listener)
+    }
+  },
   social: {
     get: (): Promise<SocialState> => ipcRenderer.invoke('social:get'),
-    signIn: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('social:signIn'),
+    signInDiscord: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('social:signInDiscord'),
+    linkDiscord: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('social:linkDiscord'),
+    signUpEmail: (form: { email: string; password: string; username: string; displayName: string }): Promise<{ ok: boolean; needsConfirmation?: boolean; error?: string }> =>
+      ipcRenderer.invoke('social:signUpEmail', form),
+    signInEmail: (email: string, password: string): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('social:signInEmail', email, password),
+    resetPassword: (email: string): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('social:resetPassword', email),
+    setPassword: (password: string): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('social:setPassword', password),
+    usernameAvailable: (name: string): Promise<boolean | null> => ipcRenderer.invoke('social:usernameAvailable', name),
     signOut: (): Promise<void> => ipcRenderer.invoke('social:signOut'),
     addFriend: (target: string): Promise<{ result?: FriendRequestResult; error?: string }> => ipcRenderer.invoke('social:addFriend', target),
     respond: (id: string, accept: boolean): Promise<{ error?: string }> => ipcRenderer.invoke('social:respond', id, accept),

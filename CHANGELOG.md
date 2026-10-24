@@ -10,7 +10,10 @@ com os grupos **Adicionado**, **Melhorado** e **Corrigido**.
 ## [Não lançado]
 
 ### Adicionado
-- **Amigos**: entre com o Discord e tenha um perfil online (nome, @usuário e avatar), com um código de amigo para compartilhar.
+- **Conta U-Hub** (opcional): crie com e-mail e senha ou entre com o Discord; dá para vincular o Discord depois. Recuperação de senha pelo e-mail, terminando dentro do app.
+- **Sincronização na nuvem**: com a conta, configurações, módulos, cores, atalhos, Quest Log, Launcher, rádios, playlists, categorias do Vault e lista de desejos voltam sozinhos em outro computador e ficam iguais entre computadores. No primeiro login de um computador que já tem dados, o app pergunta o que manter. Senhas do Vault, tokens e histórico nunca vão para a nuvem — para levar o Vault, use Exportar backup.
+- **Apresentação**: "Já tenho uma conta" traz suas configurações da nuvem e pula as etapas; a etapa de perfil oferece criar conta.
+- **Amigos**: perfil online (nome, @usuário e avatar), com um código de amigo para compartilhar.
   - Adicione amigos por @usuário ou código; aceite, recuse ou cancele pedidos.
   - Lista de amigos com status em tempo real: jogando (jogo, capa e há quanto tempo), online, ausente ou offline, e a rádio que cada um está ouvindo.
   - Privacidade: escolha se mostra o jogo e a música, ou fique invisível. Só seus amigos podem ver seu status.

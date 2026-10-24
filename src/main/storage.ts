@@ -46,6 +46,10 @@ interface PrivateSchema {
   onboardingMigrated: boolean
   /** Supabase auth session (and PKCE verifier), sealed like the vault. */
   supabaseAuth: Sealed | null
+  /** Per synced key: when it last changed on this device (ms). */
+  syncMeta: Record<string, number>
+  /** Account this device last finished a first sync with. */
+  syncedUser: string | null
   vaultBlob: string | null
   vaultMode: 'safe' | 'aes' | null
   spotifyClientId: string | null
@@ -93,6 +97,8 @@ const store = new Store<StoreSchema & PrivateSchema>({
     radarSeen: { free: [], news: [] },
     onboardingMigrated: false,
     supabaseAuth: null,
+    syncMeta: {},
+    syncedUser: null,
     vaultBlob: null,
     vaultMode: null,
     spotifyClientId: null,

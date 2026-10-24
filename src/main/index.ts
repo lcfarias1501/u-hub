@@ -8,6 +8,7 @@ import { launchGame, onLibraryChange, revealGame, scan as scanLibrary, snapshot 
 import { initNotifications } from './notifications'
 import { registerPopoverIpc } from './popover'
 import * as social from './social'
+import { resolveConflict, startSync, syncNow, syncStatus } from './sync'
 import { radarSnapshot, refreshRadar, searchSteam, startRadar } from './radar'
 import { launch } from './launcher'
 import { applySettings, canOpenAtLogin, quitting, showWindow } from './shellIntegration'
@@ -197,8 +198,17 @@ function registerIpc(): void {
   ipcMain.handle('shortcuts:pause', (_e, pause: boolean) => pauseShortcuts(!!pause))
   ipcMain.handle('discord:status', () => discordStatus())
 
+  ipcMain.handle('sync:status', () => syncStatus())
+  ipcMain.handle('sync:resolve', (_e, keep: 'cloud' | 'local') => resolveConflict(keep === 'local' ? 'local' : 'cloud'))
+  ipcMain.handle('sync:now', () => syncNow())
   ipcMain.handle('social:get', () => social.socialState())
-  ipcMain.handle('social:signIn', () => social.signIn())
+  ipcMain.handle('social:signInDiscord', () => social.signInDiscord())
+  ipcMain.handle('social:linkDiscord', () => social.linkDiscord())
+  ipcMain.handle('social:signUpEmail', (_e, form: Parameters<typeof social.signUpEmail>[0]) => social.signUpEmail(form))
+  ipcMain.handle('social:signInEmail', (_e, email: string, password: string) => social.signInEmail(String(email), String(password)))
+  ipcMain.handle('social:resetPassword', (_e, email: string) => social.resetPassword(String(email)))
+  ipcMain.handle('social:setPassword', (_e, password: string) => social.setPassword(String(password)))
+  ipcMain.handle('social:usernameAvailable', (_e, name: string) => social.usernameAvailable(String(name)))
   ipcMain.handle('social:signOut', () => social.signOut())
   ipcMain.handle('social:addFriend', (_e, target: string) => social.addFriend(String(target)))
   ipcMain.handle('social:respond', (_e, id: string, accept: boolean) => social.respondRequest(String(id), !!accept))
@@ -239,6 +249,7 @@ app.whenReady().then(() => {
     win?.webContents.send('shortcuts:status', applyShortcuts(s.shortcuts))
   })
   startDiscord(() => win)
+  startSync(() => win)
   social.startSocial(() => win)
   onLibraryChange((s) => win?.webContents.send('library:update', s))
   applySettings(getSettings(), () => win)

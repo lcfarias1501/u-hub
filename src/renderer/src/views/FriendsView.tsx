@@ -1,6 +1,7 @@
-import { Check, Copy, EyeOff, Gamepad2, Loader2, LogIn, LogOut, Music2, Pencil, Search, ShieldCheck, Trash2, UserPlus, Users, X } from 'lucide-react'
+import { Check, Copy, EyeOff, Gamepad2, Loader2, LogOut, Music2, Pencil, Search, ShieldCheck, Trash2, UserPlus, Users, X } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Friend, FriendRequestResult, Presence, SocialProfile, SocialState } from '@shared/types'
+import { AccountCard } from '@renderer/components/AccountCard'
 import { Switch } from '@renderer/components/Controls'
 import { Panel } from '@renderer/components/Panel'
 import { AccentPicker, IconPicker } from '@renderer/components/Pickers'
@@ -37,7 +38,7 @@ export function FriendsView() {
       {!s.configured ? (
         <div className="panel px-6 py-12 text-center text-[13px] text-zinc-500">Este build não tem o servidor de amigos configurado.</div>
       ) : !s.signedIn ? (
-        <SignIn loading={s.loading} />
+        <SignIn />
       ) : (
         <SignedIn s={s} />
       )}
@@ -47,20 +48,11 @@ export function FriendsView() {
 
 // ── Signed out ───────────────────────────────────────────────────────────────
 
-function SignIn({ loading }: { loading: boolean }) {
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const go = async (): Promise<void> => {
-    setBusy(true)
-    setError(null)
-    const r = await window.uhub.social.signIn()
-    setBusy(false)
-    if (!r.ok) setError(r.error ?? 'Não foi possível entrar')
-  }
+function SignIn() {
   return (
-    <div className="panel relative overflow-hidden px-10 py-14">
-      <div className="pointer-events-none absolute -top-24 -right-24 size-80 rounded-full bg-[#5865F2]/20 blur-3xl" />
-      <div className="relative max-w-xl">
+    <div className="panel relative grid grid-cols-[minmax(0,1fr)_minmax(0,420px)] gap-10 overflow-hidden px-10 py-12">
+      <div className="pointer-events-none absolute -top-24 -left-24 size-80 rounded-full bg-volt/15 blur-3xl" />
+      <div className="relative">
         <Users className="mb-4 size-10 text-volt-soft" strokeWidth={1.5} />
         <h2 className="text-[26px] font-semibold tracking-tight text-zinc-50">Seus amigos no U-Hub</h2>
         <ul className="mt-4 space-y-2 text-[14px] text-zinc-400">
@@ -68,21 +60,14 @@ function SignIn({ loading }: { loading: boolean }) {
           <li className="flex gap-2"><UserPlus className="mt-0.5 size-4 shrink-0 text-volt-soft" /> Adicione pelo nome de usuário ou por um código de amigo.</li>
           <li className="flex gap-2"><ShieldCheck className="mt-0.5 size-4 shrink-0 text-volt-soft" /> Só seus amigos veem seu status — e você pode ficar invisível.</li>
         </ul>
-        <button
-          className="mt-8 inline-flex h-11 items-center gap-2.5 rounded-[4px] bg-[#5865F2] px-5 text-[14px] font-semibold text-white transition-all hover:bg-[#4752c4] hover:shadow-[0_0_28px_-6px_#5865F2] disabled:opacity-60"
-          disabled={busy || loading}
-          onClick={go}
-        >
-          {busy || loading ? <Loader2 className="size-4 animate-spin" /> : <LogIn className="size-4" />}
-          {busy ? 'Aguardando o navegador…' : loading ? 'Carregando…' : 'Entrar com Discord'}
-        </button>
-        {error && <p className="mt-3 font-mono text-[11px] text-rose-300">✕ {error}</p>}
-        <p className="mt-4 text-[11px] text-zinc-600">O login acontece no navegador; o U-Hub só recebe seu nome e avatar do Discord.</p>
+        <p className="mt-6 text-[12px] text-zinc-500">Sua conta U-Hub também guarda suas configurações na nuvem. Entre com e-mail ou com Discord.</p>
+      </div>
+      <div className="relative">
+        <AccountCard compact />
       </div>
     </div>
   )
 }
-
 
 // ── Avatar ───────────────────────────────────────────────────────────────────
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ViewId } from '@shared/types'
 import { Sidebar } from './components/Sidebar'
 import { TopBar } from './components/TopBar'
+import { RecoveryDialog, SyncConflictDialog } from './components/AccountCard'
 import { WhatsNew } from './components/WhatsNew'
 import { Onboarding } from './views/Onboarding'
 import { navItems } from './components/nav'
@@ -115,6 +116,8 @@ function Shell() {
         </main>
       </div>
       {news && <WhatsNew entries={news} title="Novidades desde a última versão" onClose={() => setNews(null)} />}
+      <SyncConflictDialog />
+      <RecoveryDialog />
     </div>
   )
 }

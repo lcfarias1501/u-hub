@@ -542,6 +542,18 @@ export interface SocialState {
   friends: Friend[]
   requests: FriendRequest[]
   error: string | null
+  /** Login methods on the account: 'email', 'discord'. */
+  account: { email: string | null; providers: string[] } | null
+  /** Waiting for the user to click the confirmation link sent to this address. */
+  pendingEmail: string | null
+  /** Signed in through a password-reset link: ask for a new password. */
+  recovery: boolean
+}
+
+export interface SyncStatus {
+  state: 'off' | 'syncing' | 'synced' | 'error' | 'conflict'
+  lastSyncedAt: number | null
+  error: string | null
 }
 
 export type FriendRequestResult = 'sent' | 'accepted' | 'already_friends' | 'already_sent' | 'not_found' | 'self'
