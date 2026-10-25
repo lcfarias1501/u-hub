@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises'
+import { readFile, stat } from 'node:fs/promises'
 import { basename } from 'node:path'
 import { ImapFlow, type FetchMessageObject, type ListResponse, type MessageAddressObject } from 'imapflow'
 import { simpleParser, type AddressObject, type ParsedMail } from 'mailparser'
@@ -21,7 +21,7 @@ import { notify } from './notifications'
 import { getValue, readSealedMap, setValue, writeSealedMap } from './storage'
 
 const PAGE = 40
-const PREVIEW_BYTES = 6 * 1024
+const PREVIEW_BYTES = 4 * 1024
 const RECONNECT_MS = 30_000
 const UNREAD_REFRESH_MS = 2 * 60_000
 
@@ -216,7 +216,9 @@ async function onNewMail(id: string): Promise<void> {
   try {
     for await (const msg of c.watcher.fetch(`${c.lastUid + 1}:*`, { uid: true, envelope: true, flags: true, bodyStructure: true, source: { start: 0, maxLength: PREVIEW_BYTES } }, { uid: true })) {
       if (msg.uid <= c.lastUid) continue
-      fresh.push(await summarize(id, 'INBOX', msg))
+      const p = await preview(msg.source, msg.envelope?.subject ?? '')
+      cachePreview(id, 'INBOX', msg.uid, p)
+      fresh.push(summarize(id, 'INBOX', msg, p))
       c.lastUid = Math.max(c.lastUid, msg.uid)
     }
   } catch {
@@ -253,18 +255,28 @@ function hasAttachment(node: FetchMessageObject['bodyStructure']): boolean {
   return (node.childNodes ?? []).some(hasAttachment)
 }
 
-async function summarize(accountId: string, folder: string, msg: FetchMessageObject): Promise<MailSummary> {
-  let snippet = ''
-  let code: string | null = null
-  if (msg.source) {
-    try {
-      const p = await simpleParser(msg.source, { skipHtmlToText: false, skipImageLinks: true, skipTextLinks: true })
-      snippet = (p.text ?? '').replace(/\s+/g, ' ').trim().slice(0, 180)
-      code = extractCodes(msg.envelope?.subject ?? '', p.text ?? '')[0] ?? null
-    } catch {
-      /* truncated or odd MIME: no preview */
-    }
+/** Snippet + verification code from the first bytes of a message (cheap MIME parse). */
+async function preview(source: Buffer | undefined, subject: string): Promise<{ snippet: string; code: string | null }> {
+  if (!source) return { snippet: '', code: null }
+  try {
+    const p = await simpleParser(source, { skipHtmlToText: false, skipImageLinks: true, skipTextLinks: true })
+    const text = p.text ?? ''
+    return { snippet: text.replace(/\s+/g, ' ').trim().slice(0, 180), code: extractCodes(subject, text)[0] ?? null }
+  } catch {
+    return { snippet: '', code: null } // truncated or odd MIME: no preview
   }
+}
+
+/** Previews already computed, so revisiting a folder shows them instantly. */
+const previewCache = new Map<string, { snippet: string; code: string | null }>()
+const pkey = (id: string, folder: string, uid: number): string => `${id}|${folder}|${uid}`
+function cachePreview(id: string, folder: string, uid: number, p: { snippet: string; code: string | null }): void {
+  previewCache.set(pkey(id, folder, uid), p)
+  if (previewCache.size > 5000) previewCache.delete(previewCache.keys().next().value!)
+}
+
+function summarize(accountId: string, folder: string, msg: FetchMessageObject, p?: { snippet: string; code: string | null }): MailSummary {
+  const cached = p ?? previewCache.get(pkey(accountId, folder, msg.uid))
   return {
     accountId,
     folder,
@@ -276,9 +288,52 @@ async function summarize(accountId: string, folder: string, msg: FetchMessageObj
     seen: msg.flags?.has('\\Seen') ?? false,
     flagged: msg.flags?.has('\\Flagged') ?? false,
     hasAttachments: hasAttachment(msg.bodyStructure),
-    snippet,
-    code
+    snippet: cached?.snippet ?? '',
+    code: cached?.code ?? null
   }
+}
+
+// ── Background previews ──────────────────────────────────────────────────────
+
+const PREVIEW_BATCH = 10
+const previewRun = new Map<string, number>()
+
+/**
+ * Fetches previews after the list is already on screen, in small batches so a
+ * new request (opening a mail, switching folder) never waits long for the
+ * connection. Starting a new run for an account cancels the previous one.
+ */
+function schedulePreviews(id: string, folder: string, uids: number[]): void {
+  const run = (previewRun.get(id) ?? 0) + 1
+  previewRun.set(id, run)
+  const todo = uids.filter((u) => !previewCache.has(pkey(id, folder, u)))
+  if (!todo.length) return
+  void (async () => {
+    for (let i = 0; i < todo.length; i += PREVIEW_BATCH) {
+      if (previewRun.get(id) !== run) return
+      const batch = todo.slice(i, i + PREVIEW_BATCH)
+      const fetched: FetchMessageObject[] = []
+      try {
+        const w = await worker(id)
+        const lock = await w.getMailboxLock(folder)
+        try {
+          for await (const m of w.fetch(batch, { uid: true, envelope: true, source: { start: 0, maxLength: PREVIEW_BYTES } }, { uid: true })) fetched.push(m)
+        } finally {
+          lock.release()
+        }
+      } catch {
+        return
+      }
+      const out = await Promise.all(
+        fetched.map(async (m) => {
+          const p = await preview(m.source, m.envelope?.subject ?? '')
+          cachePreview(id, folder, m.uid, p)
+          return { accountId: id, folder, uid: m.uid, ...p }
+        })
+      )
+      if (out.length) getWin()?.webContents.send('mail:previews', out)
+    }
+  })()
 }
 
 export async function listFolders(id: string): Promise<MailFolder[]> {
@@ -300,46 +355,59 @@ export async function listFolders(id: string): Promise<MailFolder[]> {
     }))
 }
 
-/** Newest first, paged by PAGE; `query` searches sender, recipient and subject on the server. */
+const LIST_QUERY = { uid: true, envelope: true, flags: true, internalDate: true, bodyStructure: true } as const
+
+/**
+ * Newest first, PAGE at a time. Without a search this reads a sequence range
+ * straight from the mailbox size (no SEARCH ALL, which is slow on big Gmail
+ * folders) and returns headers only; previews follow in the background.
+ */
 export async function listMessages(id: string, folder: string, page = 0, query = ''): Promise<{ items: MailSummary[]; total: number }> {
   const w = await worker(id)
   const lock = await w.getMailboxLock(folder)
+  const items: MailSummary[] = []
+  let total = 0
   try {
-    let uids: number[]
     if (query.trim()) {
       const q = query.trim()
-      const found = await w.search({ or: [{ from: q }, { to: q }, { subject: q }] }, { uid: true })
-      uids = (found || []) as number[]
+      const found = ((await w.search({ or: [{ from: q }, { to: q }, { subject: q }] }, { uid: true })) || []) as number[]
+      found.sort((a, b) => b - a)
+      total = found.length
+      const slice = found.slice(page * PAGE, page * PAGE + PAGE)
+      if (slice.length) for await (const msg of w.fetch(slice, LIST_QUERY, { uid: true })) items.push(summarize(id, folder, msg))
     } else {
-      const found = await w.search({ all: true }, { uid: true })
-      uids = (found || []) as number[]
+      total = w.mailbox ? w.mailbox.exists : 0
+      const end = total - page * PAGE
+      if (end >= 1) {
+        const start = Math.max(1, end - PAGE + 1)
+        for await (const msg of w.fetch(`${start}:${end}`, LIST_QUERY)) items.push(summarize(id, folder, msg))
+      }
     }
-    uids.sort((a, b) => b - a)
-    const slice = uids.slice(page * PAGE, page * PAGE + PAGE)
-    if (!slice.length) return { items: [], total: uids.length }
-    const items: MailSummary[] = []
-    for await (const msg of w.fetch(slice, { uid: true, envelope: true, flags: true, internalDate: true, bodyStructure: true, source: { start: 0, maxLength: PREVIEW_BYTES } }, { uid: true })) {
-      items.push(await summarize(id, folder, msg))
-    }
-    return { items: items.sort((a, b) => b.date - a.date), total: uids.length }
   } finally {
     lock.release()
   }
+  items.sort((a, b) => b.date - a.date)
+  schedulePreviews(id, folder, items.map((m) => m.uid))
+  return { items, total }
 }
 
 /** Unified view of a category: recent inbox mail from every account matching its rules. */
 export async function listCategory(categoryId: string): Promise<MailSummary[]> {
   const rules = getValue('mailRules').filter((r) => r.categoryId === categoryId)
-  const out: MailSummary[] = []
-  for (const a of getValue('mailAccounts')) {
-    try {
-      const { items } = await listMessages(a.id, 'INBOX', 0)
-      out.push(...items.filter((m) => categorize(m, rules).length))
-    } catch {
-      /* account offline: skip */
-    }
-  }
-  return out.sort((a, b) => b.date - a.date)
+  // Accounts in parallel; an offline one just contributes nothing.
+  const lists = await Promise.all(
+    getValue('mailAccounts').map(async (a) => {
+      try {
+        const { items } = await listMessages(a.id, 'INBOX', 0)
+        const matched = items.filter((m) => categorize(m, rules).length)
+        schedulePreviews(a.id, 'INBOX', matched.map((m) => m.uid))
+        return matched
+      } catch {
+        return []
+      }
+    })
+  )
+  return lists.flat().sort((a, b) => b.date - a.date)
 }
 
 export async function openMessage(id: string, folder: string, uid: number): Promise<MailMessage> {
@@ -363,7 +431,7 @@ export async function openMessage(id: string, folder: string, uid: number): Prom
         if (att.cid) html = html.split(`cid:${att.cid}`).join(`data:${att.contentType};base64,${att.content.toString('base64')}`)
       }
     }
-    const base = await summarize(id, folder, { ...msg, source: undefined })
+    const base = summarize(id, folder, msg)
     const text = p.text ?? ''
     return {
       ...base,
@@ -463,7 +531,18 @@ export async function send(d: MailDraft): Promise<{ ok: boolean; error?: string 
   if (!splitAddrs(d.to).length) return { ok: false, error: 'Informe pelo menos um destinatário.' }
 
   const body = account.signature ? `${d.body}\n\n-- \n${account.signature}` : d.body
-  const attachments = await Promise.all(d.attachments.map(async (path) => ({ filename: basename(path), content: await readFile(path) })))
+  let attachments: { filename: string; content: Buffer }[]
+  try {
+    attachments = await Promise.all(
+      d.attachments.map(async (path) => {
+        if (!(await stat(path)).isFile()) throw new Error(`"${basename(path)}" é uma pasta (no Mac alguns documentos são pastas). Compacte em .zip e anexe o .zip.`)
+        return { filename: basename(path), content: await readFile(path) }
+      })
+    )
+  } catch (e) {
+    const err = e as NodeJS.ErrnoException
+    return { ok: false, error: err.code === 'ENOENT' ? 'Um dos anexos não existe mais.' : err.message }
+  }
   const message = {
     from: { name: account.name, address: account.email },
     to: splitAddrs(d.to),
@@ -491,11 +570,20 @@ export async function send(d: MailDraft): Promise<{ ok: boolean; error?: string 
   }
 }
 
-export async function pickAttachments(): Promise<string[]> {
+/**
+ * macOS shows some folders as single files (.app, old .pages/.key, photo
+ * libraries); those can't be attached as-is, so they're reported back
+ * instead of failing later at send time.
+ */
+export async function pickAttachments(): Promise<{ files: string[]; skipped: string[] }> {
   const win = getWin()
   const opts = { properties: ['openFile' as const, 'multiSelections' as const] }
   const { canceled, filePaths } = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
-  return canceled ? [] : filePaths
+  if (canceled) return { files: [], skipped: [] }
+  const files: string[] = []
+  const skipped: string[] = []
+  for (const p of filePaths) ((await stat(p).catch(() => null))?.isFile() ? files : skipped).push(p)
+  return { files, skipped: skipped.map((p) => basename(p)) }
 }
 
 export const mailStatus = (): MailAccountStatus[] => [...conns.values()].map((c) => c.status)

@@ -72,6 +72,9 @@ export function MailView() {
   const [managing, setManaging] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const req = useRef(0)
+  /** Last list per folder/category: switching back shows it instantly while it refreshes. */
+  const cache = useRef(new Map<string, { items: MailSummary[]; total: number }>())
+  const selKey = (s: Selection | null): string => (!s ? '' : s.kind === 'category' ? `cat:${s.id}` : `${s.accountId}|${s.folder}`)
 
   useEffect(() => {
     void window.uhub.mail.status().then(setStatuses)
@@ -107,7 +110,17 @@ export function MailView() {
         if (sel.kind === 'folder') {
           const r = await window.uhub.mail.list(sel.accountId, sel.folder, p, query)
           if (n !== req.current) return
-          setItems((prev) => (p === 0 ? r.items : [...prev, ...r.items]))
+          setItems((prev) => {
+            // Keep previews we already had for the same messages until fresh ones arrive.
+            const known = new Map(prev.map((m) => [`${m.accountId}:${m.uid}`, m]))
+            const merged = r.items.map((m) => {
+              const k = known.get(`${m.accountId}:${m.uid}`)
+              return k && !m.snippet ? { ...m, snippet: k.snippet, code: k.code } : m
+            })
+            const next = p === 0 ? merged : [...prev, ...merged]
+            if (!query.trim()) cache.current.set(selKey(sel), { items: next, total: r.total })
+            return next
+          })
           setTotal(r.total)
         } else {
           const r = await window.uhub.mail.category(sel.id)
@@ -116,6 +129,7 @@ export function MailView() {
           const filtered = q ? r.filter((m) => `${m.from.name} ${m.from.address} ${m.subject}`.toLowerCase().includes(q)) : r
           setItems(filtered)
           setTotal(filtered.length)
+          if (!q) cache.current.set(selKey(sel), { items: filtered, total: filtered.length })
         }
         setPage(p)
       } catch (e) {
@@ -129,6 +143,9 @@ export function MailView() {
 
   useEffect(() => {
     setOpen(null)
+    const cached = cache.current.get(selKey(sel))
+    setItems(cached?.items ?? [])
+    setTotal(cached?.total ?? 0)
     void load(0)
   }, [sel])
 
@@ -137,6 +154,22 @@ export function MailView() {
     const t = setTimeout(() => void load(0), 400)
     return () => clearTimeout(t)
   }, [query])
+
+  // Snippets and codes arrive after the list (fetched in the background).
+  useEffect(
+    () =>
+      window.uhub.mail.onPreviews((batch) => {
+        const map = new Map(batch.map((b) => [`${b.accountId}:${b.folder}:${b.uid}`, b]))
+        const patch = (list: MailSummary[]): MailSummary[] =>
+          list.map((m) => {
+            const b = map.get(`${m.accountId}:${m.folder}:${m.uid}`)
+            return b ? { ...m, snippet: b.snippet, code: b.code } : m
+          })
+        setItems(patch)
+        for (const [k, v] of cache.current) cache.current.set(k, { ...v, items: patch(v.items) })
+      }),
+    []
+  )
 
   // New mail arrives live (IMAP IDLE).
   useEffect(
@@ -324,7 +357,14 @@ export function MailView() {
 
       {/* ── Middle: message list ── */}
       <section className="flex min-h-0 flex-col border-r border-white/[0.06]">
-        <div className="space-y-2 border-b border-white/[0.06] p-3">
+        <div className="relative space-y-2 border-b border-white/[0.06] p-3">
+          {/* Indeterminate progress while the list loads or refreshes. */}
+          {listLoading && (
+            <span className="absolute inset-x-0 -bottom-px h-0.5 overflow-hidden">
+              <span className="absolute inset-y-0 w-1/3 animate-[mail-progress_1.1s_ease-in-out_infinite] bg-volt shadow-[0_0_8px_var(--color-volt)]" />
+              <style>{'@keyframes mail-progress{0%{left:-33%}100%{left:100%}}'}</style>
+            </span>
+          )}
           <div className="flex items-center gap-2">
             <h2 className="flex-1 truncate text-[15px] font-semibold text-zinc-100">{title}</h2>
             <span className="font-mono text-[10px] text-zinc-600">{total}</span>
@@ -340,7 +380,9 @@ export function MailView() {
         <div className="min-h-0 flex-1 overflow-y-auto">
           {listError ? (
             <p className="p-4 text-[12px] text-rose-300">{listError}</p>
-          ) : !items.length && !listLoading ? (
+          ) : !items.length && listLoading ? (
+            Array.from({ length: 9 }, (_, i) => <SkeletonRow key={i} />)
+          ) : !items.length ? (
             <p className="p-8 text-center text-[12px] text-zinc-600">{sel?.kind === 'category' ? 'Nenhum e-mail recente nesta categoria.' : 'Nada por aqui.'}</p>
           ) : (
             items.map((m) => (
@@ -532,6 +574,19 @@ function MailRow({
           {showAccount && <span className={`font-mono text-[9px] ${ACCENTS[showAccount.accent].tone.split(' ')[0]}`}>{showAccount.email}</span>}
         </div>
       )}
+    </div>
+  )
+}
+
+function SkeletonRow() {
+  return (
+    <div className="space-y-2 border-b border-white/[0.04] px-5 py-3">
+      <div className="flex gap-3">
+        <span className="h-3 w-1/3 animate-pulse rounded-full bg-white/[0.07]" />
+        <span className="ml-auto h-3 w-10 animate-pulse rounded-full bg-white/[0.05]" />
+      </div>
+      <span className="block h-3 w-3/4 animate-pulse rounded-full bg-white/[0.06]" />
+      <span className="block h-2.5 w-full animate-pulse rounded-full bg-white/[0.04]" />
     </div>
   )
 }

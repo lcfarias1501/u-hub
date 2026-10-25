@@ -86,7 +86,14 @@ export function Compose({ draft: initial, accounts, contacts, onClose }: { draft
       {error && <p className="mb-3 rounded-[3px] border border-crit/30 bg-crit/[0.08] px-3 py-2 text-[12px] text-rose-200">{error}</p>}
 
       <div className="flex items-center gap-2">
-        <button className="btn" onClick={async () => set('attachments', [...new Set([...d.attachments, ...(await window.uhub.mail.pickAttachments())])])}>
+        <button
+          className="btn"
+          onClick={async () => {
+            const r = await window.uhub.mail.pickAttachments()
+            set('attachments', [...new Set([...d.attachments, ...r.files])])
+            setError(r.skipped.length ? `Não dá para anexar pastas: ${r.skipped.join(', ')}. Compacte em .zip e anexe o .zip.` : null)
+          }}
+        >
           <Paperclip className="size-3.5" /> Anexar
         </button>
         <button className="btn ml-auto" onClick={() => onClose(false)}>

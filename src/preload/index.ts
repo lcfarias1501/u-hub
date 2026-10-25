@@ -141,12 +141,18 @@ const api = {
     flag: (id: string, folder: string, uid: number, flag: 'seen' | 'flagged', value: boolean): Promise<void> => ipcRenderer.invoke('mail:flag', id, folder, uid, flag, value),
     move: (id: string, folder: string, uid: number, to: 'archive' | 'trash'): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('mail:move', id, folder, uid, to),
     send: (draft: MailDraft): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('mail:send', draft),
-    pickAttachments: (): Promise<string[]> => ipcRenderer.invoke('mail:pickAttachments'),
+    pickAttachments: (): Promise<{ files: string[]; skipped: string[] }> => ipcRenderer.invoke('mail:pickAttachments'),
     saveAttachment: (id: string, folder: string, uid: number, index: number): Promise<{ ok: boolean; path?: string }> => ipcRenderer.invoke('mail:saveAttachment', id, folder, uid, index),
     onStatus: (cb: (s: MailAccountStatus[]) => void): (() => void) => {
       const listener = (_: unknown, s: MailAccountStatus[]): void => cb(s)
       ipcRenderer.on('mail:status', listener)
       return () => ipcRenderer.off('mail:status', listener)
+    },
+    /** Snippets/codes arriving after a list was shown. */
+    onPreviews: (cb: (p: { accountId: string; folder: string; uid: number; snippet: string; code: string | null }[]) => void): (() => void) => {
+      const listener = (_: unknown, p: { accountId: string; folder: string; uid: number; snippet: string; code: string | null }[]): void => cb(p)
+      ipcRenderer.on('mail:previews', listener)
+      return () => ipcRenderer.off('mail:previews', listener)
     },
     onNew: (cb: (m: MailSummary[]) => void): (() => void) => {
       const listener = (_: unknown, m: MailSummary[]): void => cb(m)
