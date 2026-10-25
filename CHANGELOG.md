@@ -9,6 +9,8 @@ com os grupos **Adicionado**, **Melhorado** e **Corrigido**.
 
 ## [Não lançado]
 
+## [0.7.0] - 2026-10-25
+
 ### Adicionado
 - **Conta U-Hub** (opcional): crie com e-mail e senha ou entre com o Discord; dá para vincular o Discord depois. Recuperação de senha pelo e-mail, terminando dentro do app.
 - **Sincronização na nuvem**: com a conta, configurações, módulos, cores, atalhos, Quest Log, Launcher, rádios, playlists, categorias do Vault e lista de desejos voltam sozinhos em outro computador e ficam iguais entre computadores. No primeiro login de um computador que já tem dados, o app pergunta o que manter. Senhas do Vault, tokens e histórico nunca vão para a nuvem — para levar o Vault, use Exportar backup.
