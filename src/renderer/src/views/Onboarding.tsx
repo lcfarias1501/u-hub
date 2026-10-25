@@ -39,6 +39,7 @@ const MODULE_PITCH: Record<ModuleId, string> = {
   library: 'Seus jogos da Steam, Epic e outros num só lugar, com tempo de jogo.',
   radar: 'Jogos grátis, promoções, alerta de preço e patch notes dos seus jogos.',
   friends: 'Adicione amigos e veja em tempo real o que cada um está jogando.',
+  mail: 'Seus e-mails (Gmail, iCloud, outros) organizados por categorias, com códigos de verificação a um clique.',
   vault: 'Senhas, keys e servidores de jogo criptografados no seu computador.',
   media: 'Rádios lofi e synthwave embutidas e controle do Spotify.',
   quests: 'Kanban para builds e tarefas, mais atalhos para abrir apps e pastas.'

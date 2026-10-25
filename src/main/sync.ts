@@ -21,7 +21,10 @@ const SYNC_KEYS = [
   'wishlist',
   'newsSources',
   'hiddenGames',
-  'profile'
+  'profile',
+  'mailCategories',
+  'mailRules',
+  'mailTrustedSenders'
 ] as const satisfies readonly StoreKey[]
 type SyncKey = (typeof SYNC_KEYS)[number]
 

@@ -1,4 +1,4 @@
-import { Bell, BellOff, CheckCheck, Gamepad2, Gift, Info, Settings, Tag, Trash2, Users, Wrench, type LucideIcon } from 'lucide-react'
+import { Bell, BellOff, CheckCheck, Gamepad2, Gift, Info, Mail, Settings, Tag, Trash2, Users, Wrench, type LucideIcon } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { AppNotification, NotificationKind, ViewId } from '@shared/types'
 import { usePersistentState } from '@renderer/hooks/usePersistentState'
@@ -8,6 +8,7 @@ const KIND: Record<NotificationKind, { icon: LucideIcon; tone: string; label: st
   price: { icon: Tag, tone: 'text-amber-200 bg-warn/10 border-warn/25', label: 'Preço' },
   patch: { icon: Wrench, tone: 'text-volt-200 bg-volt/10 border-volt/25', label: 'Patch' },
   game: { icon: Gamepad2, tone: 'text-sky-200 bg-sky-500/10 border-sky-400/25', label: 'Sessão' },
+  mail: { icon: Mail, tone: 'text-sky-200 bg-sky-500/10 border-sky-400/25', label: 'E-mail' },
   social: { icon: Users, tone: 'text-indigo-200 bg-indigo-500/10 border-indigo-400/25', label: 'Amigos' },
   system: { icon: Info, tone: 'text-zinc-300 bg-white/5 border-white/15', label: 'Sistema' }
 }

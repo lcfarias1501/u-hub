@@ -336,6 +336,7 @@ const KINDS: { kind: NotificationKind; title: string; description: string }[] = 
   { kind: 'free', title: 'Jogos grátis', description: 'Quando a Epic libera um jogo grátis novo.' },
   { kind: 'price', title: 'Alertas de preço', description: 'Quando um jogo da lista de desejos entra em promoção ou chega no seu preço.' },
   { kind: 'patch', title: 'Patches', description: 'Notas de atualização dos jogos da Steam que você jogou nos últimos 30 dias.' },
+  { kind: 'mail', title: 'E-mail', description: 'E-mails novos (por conta: todos, só das categorias que notificam, ou nenhum).' },
   { kind: 'social', title: 'Amigos', description: 'Pedidos de amizade, novas amizades e quando um amigo começa a jogar.' },
   { kind: 'game', title: 'Resumo de sessão', description: 'Quanto tempo você jogou, quando fecha um jogo (sessões de 10 min ou mais).' }
 ]

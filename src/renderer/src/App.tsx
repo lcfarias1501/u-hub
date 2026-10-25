@@ -15,6 +15,7 @@ import { startSystemFeed } from './lib/systemFeed'
 import { FriendsView } from './views/FriendsView'
 import { LibraryView } from './views/LibraryView'
 import { MediaView } from './views/MediaView'
+import { MailView, useMailUnread } from './views/mail/MailView'
 import { PerformanceView } from './views/PerformanceView'
 import { QuestView } from './views/QuestView'
 import { RadarView } from './views/RadarView'
@@ -84,6 +85,7 @@ function Shell() {
   useEffect(() => window.uhub.app.onNavigate((v) => (v === 'settings' || modules.includes(v)) && setView(v)))
 
   const items = useMemo(() => navItems(modules), [modules])
+  const mailUnread = useMailUnread()
 
   useModHotkeys({
     b: () => setCollapsed((c) => !c),
@@ -99,12 +101,13 @@ function Shell() {
     <div className="hub-backdrop flex h-full flex-col">
       <TopBar view={view} onNavigate={setView} onOpenSettings={() => setView(view === 'settings' ? (lastView as ViewId) : 'settings')} />
       <div className="flex min-h-0 flex-1">
-        <Sidebar items={items} active={view} collapsed={collapsed} onSelect={setView} onToggle={() => setCollapsed((c) => !c)} />
+        <Sidebar items={items} badges={{ mail: mailUnread }} active={view} collapsed={collapsed} onSelect={setView} onToggle={() => setCollapsed((c) => !c)} />
         <main className="relative min-w-0 flex-1 overflow-y-auto">
           {view === 'performance' && <PerformanceView />}
           {view === 'library' && <LibraryView />}
           {view === 'radar' && <RadarView />}
           {view === 'friends' && <FriendsView />}
+          {view === 'mail' && <MailView />}
           {view === 'vault' && <VaultView />}
           {view === 'quests' && <QuestView />}
           {view === 'settings' && <SettingsView />}

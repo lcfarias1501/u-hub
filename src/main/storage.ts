@@ -46,6 +46,8 @@ interface PrivateSchema {
   onboardingMigrated: boolean
   /** Supabase auth session (and PKCE verifier), sealed like the vault. */
   supabaseAuth: Sealed | null
+  /** Mail passwords by account id, sealed like the vault. */
+  mailSecrets: Sealed | null
   /** Per synced key: when it last changed on this device (ms). */
   syncMeta: Record<string, number>
   /** Account this device last finished a first sync with. */
@@ -93,10 +95,34 @@ const store = new Store<StoreSchema & PrivateSchema>({
     lastSeenVersion: null,
     profile: null,
     onboarded: false,
+    mailAccounts: [],
+    mailCategories: [
+      { id: 'games', name: 'Jogos', icon: 'gamepad', accent: 'violet', notify: true },
+      { id: 'security', name: 'Códigos & segurança', icon: 'shield', accent: 'emerald', notify: true },
+      { id: 'shopping', name: 'Compras', icon: 'wallet', accent: 'amber', notify: false }
+    ],
+    mailRules: [
+      { id: 'r-steam', categoryId: 'games', field: 'from', contains: 'steampowered.com' },
+      { id: 'r-epic', categoryId: 'games', field: 'from', contains: 'epicgames.com' },
+      { id: 'r-bnet', categoryId: 'games', field: 'from', contains: 'blizzard.com' },
+      { id: 'r-riot', categoryId: 'games', field: 'from', contains: 'riotgames.com' },
+      { id: 'r-gog', categoryId: 'games', field: 'from', contains: 'gog.com' },
+      { id: 'r-humble', categoryId: 'games', field: 'from', contains: 'humblebundle.com' },
+      { id: 'r-xbox', categoryId: 'games', field: 'from', contains: 'xbox.com' },
+      { id: 'r-psn', categoryId: 'games', field: 'from', contains: 'playstation' },
+      { id: 'r-nintendo', categoryId: 'games', field: 'from', contains: 'nintendo' },
+      { id: 'r-ea', categoryId: 'games', field: 'from', contains: 'ea.com' },
+      { id: 'r-ubi', categoryId: 'games', field: 'from', contains: 'ubisoft' },
+      { id: 'r-code', categoryId: 'security', field: 'subject', contains: 'código' },
+      { id: 'r-code-en', categoryId: 'security', field: 'subject', contains: 'code' },
+      { id: 'r-verify', categoryId: 'security', field: 'subject', contains: 'verifica' }
+    ],
+    mailTrustedSenders: [],
     radarCache: null,
     radarSeen: { free: [], news: [] },
     onboardingMigrated: false,
     supabaseAuth: null,
+    mailSecrets: null,
     syncMeta: {},
     syncedUser: null,
     vaultBlob: null,
@@ -115,7 +141,7 @@ if (!store.get('onboardingMigrated')) {
 }
 
 const PUBLIC_KEYS = new Set<StoreKey>([
-  'sidebarCollapsed', 'lastView', 'perfLayout', 'quests', 'launchers', 'stations', 'playlists', 'volume', 'vaultCategories', 'settings', 'manualGames', 'hiddenGames', 'playtime', 'wishlist', 'newsSources', 'notifications', 'lastSeenVersion', 'profile', 'onboarded'
+  'sidebarCollapsed', 'lastView', 'perfLayout', 'quests', 'launchers', 'stations', 'playlists', 'volume', 'vaultCategories', 'settings', 'manualGames', 'hiddenGames', 'playtime', 'wishlist', 'newsSources', 'notifications', 'lastSeenVersion', 'profile', 'onboarded', 'mailAccounts', 'mailCategories', 'mailRules', 'mailTrustedSenders'
 ])
 
 /** Keys included in backups (everything user-authored except secrets and Spotify auth). */
@@ -250,7 +276,7 @@ export function readSpotifyAuth<T>(): T | null {
 }
 
 /** Generic sealed key/value bag (used as the Supabase auth storage). */
-export function readSealedMap(key: 'supabaseAuth'): Record<string, string> {
+export function readSealedMap(key: 'supabaseAuth' | 'mailSecrets'): Record<string, string> {
   const sealed = store.get(key)
   if (!sealed) return {}
   try {
@@ -260,7 +286,7 @@ export function readSealedMap(key: 'supabaseAuth'): Record<string, string> {
   }
 }
 
-export function writeSealedMap(key: 'supabaseAuth', value: Record<string, string>): void {
+export function writeSealedMap(key: 'supabaseAuth' | 'mailSecrets', value: Record<string, string>): void {
   store.set(key, Object.keys(value).length ? encrypt(JSON.stringify(value)) : null)
 }
 

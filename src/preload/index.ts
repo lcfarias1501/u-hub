@@ -13,6 +13,12 @@ import type {
   FriendRequestResult,
   SocialState,
   SyncStatus,
+  MailAccount,
+  MailAccountStatus,
+  MailDraft,
+  MailFolder,
+  MailMessage,
+  MailSummary,
   ModuleId,
   RadioCommand,
   RadioState,
@@ -122,6 +128,31 @@ const api = {
     export: (password: string | null): Promise<{ ok: boolean; path?: string }> => ipcRenderer.invoke('backup:export', password),
     inspect: (): Promise<BackupSummary | null> => ipcRenderer.invoke('backup:inspect'),
     restore: (password: string | null): Promise<void> => ipcRenderer.invoke('backup:restore', password)
+  },
+  mail: {
+    status: (): Promise<MailAccountStatus[]> => ipcRenderer.invoke('mail:status'),
+    test: (account: MailAccount, pass: string): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('mail:test', account, pass),
+    saveAccount: (account: MailAccount, pass: string | null): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('mail:saveAccount', account, pass),
+    removeAccount: (id: string): Promise<void> => ipcRenderer.invoke('mail:removeAccount', id),
+    folders: (id: string): Promise<MailFolder[]> => ipcRenderer.invoke('mail:folders', id),
+    list: (id: string, folder: string, page: number, query: string): Promise<{ items: MailSummary[]; total: number }> => ipcRenderer.invoke('mail:list', id, folder, page, query),
+    category: (categoryId: string): Promise<MailSummary[]> => ipcRenderer.invoke('mail:category', categoryId),
+    open: (id: string, folder: string, uid: number): Promise<MailMessage> => ipcRenderer.invoke('mail:open', id, folder, uid),
+    flag: (id: string, folder: string, uid: number, flag: 'seen' | 'flagged', value: boolean): Promise<void> => ipcRenderer.invoke('mail:flag', id, folder, uid, flag, value),
+    move: (id: string, folder: string, uid: number, to: 'archive' | 'trash'): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('mail:move', id, folder, uid, to),
+    send: (draft: MailDraft): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke('mail:send', draft),
+    pickAttachments: (): Promise<string[]> => ipcRenderer.invoke('mail:pickAttachments'),
+    saveAttachment: (id: string, folder: string, uid: number, index: number): Promise<{ ok: boolean; path?: string }> => ipcRenderer.invoke('mail:saveAttachment', id, folder, uid, index),
+    onStatus: (cb: (s: MailAccountStatus[]) => void): (() => void) => {
+      const listener = (_: unknown, s: MailAccountStatus[]): void => cb(s)
+      ipcRenderer.on('mail:status', listener)
+      return () => ipcRenderer.off('mail:status', listener)
+    },
+    onNew: (cb: (m: MailSummary[]) => void): (() => void) => {
+      const listener = (_: unknown, m: MailSummary[]): void => cb(m)
+      ipcRenderer.on('mail:new', listener)
+      return () => ipcRenderer.off('mail:new', listener)
+    }
   },
   sync: {
     status: (): Promise<SyncStatus> => ipcRenderer.invoke('sync:status'),

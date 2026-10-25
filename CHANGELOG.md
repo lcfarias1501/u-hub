@@ -9,6 +9,16 @@ com os grupos **Adicionado**, **Melhorado** e **Corrigido**.
 
 ## [Não lançado]
 
+### Adicionado
+- **E-mail**: novo módulo para ler e enviar e-mails pelo U-Hub, com sua própria conta (Gmail, iCloud, Yahoo, Zoho ou qualquer IMAP/SMTP). A senha fica criptografada no computador e nunca vai para a nuvem.
+  - Várias contas, com pastas (Entrada, Enviados, Arquivo, Lixeira…), busca e contador de não lidos na barra lateral.
+  - Escrever, responder, responder a todos e encaminhar, com anexos, assinatura e sugestão de contatos.
+  - **Categorias com regras automáticas** ("de fulano", "do domínio @loja.com", "assunto contém…"), organizando os e-mails dentro do U-Hub sem mexer nas pastas da conta. Já vem com Jogos, Códigos & segurança e Compras. "Categorizar" num e-mail cria a regra do remetente com um clique.
+  - **Códigos de verificação** (Steam Guard, Epic, bancos…) detectados com botão "Copiar código" na lista, no e-mail e na notificação.
+  - **Keys de jogos** detectadas com "Salvar no Vault".
+  - Imagens externas bloqueadas por padrão (evitam rastreamento de leitura), com "Mostrar" ou "Sempre deste remetente".
+  - Notificação de e-mail novo em tempo real, por conta: todos, só das categorias que notificam, ou nenhum.
+
 ## [0.7.0] - 2026-10-25
 
 ### Adicionado

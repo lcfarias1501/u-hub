@@ -1,12 +1,13 @@
 import { join } from 'node:path'
 import { BrowserWindow, app, clipboard, dialog, globalShortcut, ipcMain, session, shell } from 'electron'
-import type { AppInfo, SpotifyCommand, StoreSchema, VaultEntry } from '@shared/types'
+import type { AppInfo, MailAccount, MailDraft, SpotifyCommand, StoreSchema, VaultEntry } from '@shared/types'
 import { exportBackup, inspectBackup, restoreBackup } from './backup'
 import { discordStatus, startDiscord, stopDiscord } from './discord'
 import { applyShortcuts, initShortcuts, pauseShortcuts, shortcutStatus } from './shortcuts'
 import { launchGame, onLibraryChange, revealGame, scan as scanLibrary, snapshot as librarySnapshot, startLibrary, suggestName } from './games'
 import { initNotifications } from './notifications'
 import { registerPopoverIpc } from './popover'
+import * as mail from './mail'
 import * as social from './social'
 import { resolveConflict, startSync, syncNow, syncStatus } from './sync'
 import { radarSnapshot, refreshRadar, searchSteam, startRadar } from './radar'
@@ -198,6 +199,22 @@ function registerIpc(): void {
   ipcMain.handle('shortcuts:pause', (_e, pause: boolean) => pauseShortcuts(!!pause))
   ipcMain.handle('discord:status', () => discordStatus())
 
+  ipcMain.handle('mail:status', () => mail.mailStatus())
+  ipcMain.handle('mail:test', (_e, account: MailAccount, pass: string) => mail.testAccount(account, String(pass)))
+  ipcMain.handle('mail:saveAccount', (_e, account: MailAccount, pass: string | null) => mail.saveAccount(account, pass ? String(pass) : null))
+  ipcMain.handle('mail:removeAccount', (_e, id: string) => mail.removeAccount(String(id)))
+  ipcMain.handle('mail:folders', (_e, id: string) => mail.listFolders(String(id)))
+  ipcMain.handle('mail:list', (_e, id: string, folder: string, page: number, query: string) => mail.listMessages(String(id), String(folder), Number(page) || 0, String(query ?? '')))
+  ipcMain.handle('mail:category', (_e, categoryId: string) => mail.listCategory(String(categoryId)))
+  ipcMain.handle('mail:open', (_e, id: string, folder: string, uid: number) => mail.openMessage(String(id), String(folder), Number(uid)))
+  ipcMain.handle('mail:flag', (_e, id: string, folder: string, uid: number, flag: 'seen' | 'flagged', value: boolean) =>
+    mail.setFlag(String(id), String(folder), Number(uid), flag === 'seen' ? 'seen' : 'flagged', !!value)
+  )
+  ipcMain.handle('mail:move', (_e, id: string, folder: string, uid: number, to: 'archive' | 'trash') => mail.moveMessage(String(id), String(folder), Number(uid), to === 'trash' ? 'trash' : 'archive'))
+  ipcMain.handle('mail:send', (_e, draft: MailDraft) => mail.send(draft))
+  ipcMain.handle('mail:pickAttachments', () => mail.pickAttachments())
+  ipcMain.handle('mail:saveAttachment', (_e, id: string, folder: string, uid: number, index: number) => mail.saveAttachment(String(id), String(folder), Number(uid), Number(index)))
+
   ipcMain.handle('sync:status', () => syncStatus())
   ipcMain.handle('sync:resolve', (_e, keep: 'cloud' | 'local') => resolveConflict(keep === 'local' ? 'local' : 'cloud'))
   ipcMain.handle('sync:now', () => syncNow())
@@ -250,6 +267,7 @@ app.whenReady().then(() => {
   })
   startDiscord(() => win)
   startSync(() => win)
+  mail.startMail(() => win)
   social.startSocial(() => win)
   onLibraryChange((s) => win?.webContents.send('library:update', s))
   applySettings(getSettings(), () => win)
@@ -260,6 +278,7 @@ app.whenReady().then(() => {
 // Leave no stale status on the user's Discord profile.
 app.on('before-quit', () => {
   stopDiscord()
+  void mail.stopMail()
   void social.stopSocial()
 })
 app.on('will-quit', () => globalShortcut.unregisterAll())

@@ -10,13 +10,15 @@ const ITEM_H = 44
 
 interface SidebarProps {
   items: NavItem[]
+  /** Small counters next to a module (e.g. unread mail). */
+  badges?: Partial<Record<ViewId, number>>
   active: ViewId
   collapsed: boolean
   onSelect: (id: ViewId) => void
   onToggle: () => void
 }
 
-export function Sidebar({ items, active, collapsed, onSelect, onToggle }: SidebarProps) {
+export function Sidebar({ items, badges = {}, active, collapsed, onSelect, onToggle }: SidebarProps) {
   // -1 while Settings is open: the indicator fades out instead of pointing at a module.
   const activeIndex = items.findIndex((n) => n.id === active)
 
@@ -51,10 +53,17 @@ export function Sidebar({ items, active, collapsed, onSelect, onToggle }: Sideba
                 collapsed ? 'justify-center' : 'px-3'
               } ${isActive ? 'text-white' : 'text-zinc-500 hover:bg-white/[0.03] hover:text-zinc-200'}`}
             >
-              <Icon
-                className={`size-[18px] shrink-0 transition-transform duration-200 group-hover:scale-110 ${isActive ? 'text-volt-soft drop-shadow-[0_0_6px_var(--color-volt)]' : ''}`}
-                strokeWidth={1.75}
-              />
+              <span className="relative shrink-0">
+                <Icon
+                  className={`size-[18px] transition-transform duration-200 group-hover:scale-110 ${isActive ? 'text-volt-soft drop-shadow-[0_0_6px_var(--color-volt)]' : ''}`}
+                  strokeWidth={1.75}
+                />
+                {!!badges[id] && (
+                  <span className="absolute -top-1.5 -right-2 grid h-3.5 min-w-3.5 place-items-center rounded-full bg-volt px-0.5 font-mono text-[8px] font-bold text-white">
+                    {badges[id]! > 99 ? '99+' : badges[id]}
+                  </span>
+                )}
+              </span>
               {!collapsed && (
                 <>
                   <span className="truncate text-[13px] font-medium">{label}</span>

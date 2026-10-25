@@ -81,7 +81,7 @@ export interface SpotifyPlaylist {
   uri: string
 }
 
-export type ModuleId = 'performance' | 'library' | 'radar' | 'friends' | 'vault' | 'media' | 'quests'
+export type ModuleId = 'performance' | 'library' | 'radar' | 'friends' | 'mail' | 'vault' | 'media' | 'quests'
 export type ViewId = ModuleId | 'settings'
 
 /** App-wide accent (the "volt" colour). A subset of Accent that reads well as a primary. */
@@ -152,6 +152,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     { id: 'library', visible: true },
     { id: 'radar', visible: true },
     { id: 'friends', visible: true },
+    { id: 'mail', visible: true },
     { id: 'vault', visible: true },
     { id: 'media', visible: true },
     { id: 'quests', visible: true }
@@ -166,7 +167,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   sidebarMode: 'remember',
   zoom: 1,
   notifications: {
-    system: { free: true, price: true, patch: true, game: false, social: true, system: true },
+    system: { free: true, price: true, patch: true, game: false, social: true, mail: true, system: true },
     quietWhilePlaying: true,
     sound: true,
     badge: true
@@ -246,6 +247,11 @@ export interface StoreSchema {
   profile: Profile | null
   /** First-run presentation finished (or skipped). */
   onboarded: boolean
+  mailAccounts: MailAccount[]
+  mailCategories: MailCategory[]
+  mailRules: MailRule[]
+  /** Senders whose remote images load automatically. */
+  mailTrustedSenders: string[]
   stations: RadioStation[]
   playlists: SpotifyPlaylist[]
   volume: number
@@ -481,7 +487,7 @@ export interface RadarSnapshot {
 
 // ── Notifications ────────────────────────────────────────────────────────────
 
-export type NotificationKind = 'free' | 'price' | 'patch' | 'game' | 'social' | 'system'
+export type NotificationKind = 'free' | 'price' | 'patch' | 'game' | 'social' | 'mail' | 'system'
 
 export interface AppNotification {
   id: string
@@ -565,4 +571,204 @@ export interface SocialSettings {
   shareMusic: boolean
   /** Appear offline to everyone. */
   invisible: boolean
+}
+
+// ── Mail ─────────────────────────────────────────────────────────────────────
+
+export type MailPreset = 'gmail' | 'icloud' | 'yahoo' | 'zoho' | 'outlook' | 'custom'
+
+export interface MailServer {
+  host: string
+  port: number
+  /** true = TLS from the start (993/465); false = STARTTLS (143/587). */
+  secure: boolean
+}
+
+/** Account config without the password (that one is sealed separately and never synced). */
+export interface MailAccount {
+  id: string
+  name: string
+  email: string
+  preset: MailPreset
+  username: string
+  imap: MailServer
+  smtp: MailServer
+  accent: Accent
+  signature: string
+  /** OS notification for new mail: everything, only mail matching a notifying category, or none. */
+  notify: 'all' | 'categories' | 'none'
+}
+
+export interface MailAccountStatus {
+  id: string
+  state: 'connecting' | 'online' | 'error' | 'offline'
+  error: string | null
+  unread: number
+}
+
+export interface MailFolder {
+  path: string
+  name: string
+  /** IMAP special-use flag: \Inbox, \Sent, \Drafts, \Trash, \Junk, \Archive, \All, \Flagged — or null. */
+  specialUse: string | null
+  unread: number | null
+}
+
+export interface MailAddress {
+  name: string
+  address: string
+}
+
+export interface MailSummary {
+  accountId: string
+  folder: string
+  uid: number
+  from: MailAddress
+  to: MailAddress[]
+  subject: string
+  date: number
+  seen: boolean
+  flagged: boolean
+  hasAttachments: boolean
+  snippet: string
+  /** Verification code detected in the first part of the message. */
+  code: string | null
+}
+
+export interface MailAttachment {
+  index: number
+  filename: string
+  contentType: string
+  size: number
+}
+
+export interface MailMessage extends MailSummary {
+  cc: MailAddress[]
+  replyTo: MailAddress[]
+  messageId: string | null
+  references: string[]
+  html: string | null
+  text: string
+  attachments: MailAttachment[]
+  codes: string[]
+  gameKeys: string[]
+  /** HTML references remote images (blocked until the user allows them). */
+  remoteImages: boolean
+}
+
+export interface MailCategory {
+  id: string
+  name: string
+  icon: string
+  accent: Accent
+  /** New mail matching this category triggers a notification (with account notify = 'categories'). */
+  notify: boolean
+}
+
+export interface MailRule {
+  id: string
+  categoryId: string
+  field: 'from' | 'to' | 'subject'
+  contains: string
+}
+
+export interface MailDraft {
+  accountId: string
+  to: string
+  cc: string
+  bcc: string
+  subject: string
+  body: string
+  attachments: string[]
+  inReplyTo?: string | null
+  references?: string[]
+}
+
+export const MAIL_PRESETS: Record<MailPreset, { label: string; imap: MailServer; smtp: MailServer; help: string; helpUrl?: string }> = {
+  gmail: {
+    label: 'Gmail',
+    imap: { host: 'imap.gmail.com', port: 993, secure: true },
+    smtp: { host: 'smtp.gmail.com', port: 465, secure: true },
+    help: 'Use uma senha de app (não a senha normal): Conta Google → Segurança → Verificação em duas etapas → Senhas de app.',
+    helpUrl: 'https://myaccount.google.com/apppasswords'
+  },
+  icloud: {
+    label: 'iCloud',
+    imap: { host: 'imap.mail.me.com', port: 993, secure: true },
+    smtp: { host: 'smtp.mail.me.com', port: 587, secure: false },
+    help: 'Use uma senha específica de app: account.apple.com → Iniciar sessão e segurança → Senhas específicas de app.',
+    helpUrl: 'https://account.apple.com'
+  },
+  yahoo: {
+    label: 'Yahoo',
+    imap: { host: 'imap.mail.yahoo.com', port: 993, secure: true },
+    smtp: { host: 'smtp.mail.yahoo.com', port: 465, secure: true },
+    help: 'Gere uma senha de app em Segurança da conta → Gerar senha de app.',
+    helpUrl: 'https://login.yahoo.com/account/security'
+  },
+  zoho: {
+    label: 'Zoho',
+    imap: { host: 'imap.zoho.com', port: 993, secure: true },
+    smtp: { host: 'smtp.zoho.com', port: 465, secure: true },
+    help: 'Ative o acesso IMAP nas configurações do Zoho Mail. Com 2FA, use uma senha de app.'
+  },
+  outlook: {
+    label: 'Outlook / Hotmail',
+    imap: { host: 'outlook.office365.com', port: 993, secure: true },
+    smtp: { host: 'smtp.office365.com', port: 587, secure: false },
+    help: 'Contas Microsoft pessoais (outlook.com/hotmail) não aceitam mais senha nesse tipo de acesso — só funciona em contas corporativas que liberem IMAP com senha.'
+  },
+  custom: {
+    label: 'Outro (IMAP/SMTP)',
+    imap: { host: '', port: 993, secure: true },
+    smtp: { host: '', port: 465, secure: true },
+    help: 'Pegue os dados de IMAP e SMTP no painel do seu provedor ou hospedagem.'
+  }
+}
+
+// ── Mail helpers (shared by main and renderer) ───────────────────────────────
+
+const CODE_HINT = /(c[oó]digo|code|pin|otp|token|verifica|confirma|steam guard|login|acesso|access|seguran|security|one[- ]time)/i
+
+/**
+ * Verification codes ("Seu código é 482913", Steam Guard "F7K2M"): a 4–8 char
+ * token with at least one digit, close to a keyword. Conservative on purpose —
+ * a wrong "Copiar código" is worse than none.
+ */
+export function extractCodes(subject: string, text: string): string[] {
+  const out = new Set<string>()
+  const hay = `${subject}\n${text}`.slice(0, 6000)
+  const re = /\b([A-Z0-9]{4,8})\b/g
+  for (const m of hay.matchAll(re)) {
+    const tok = m[1]
+    if (!/\d/.test(tok) || /^(19|20)\d{2}$/.test(tok)) continue // needs a digit; skip years
+    if (/^\d+$/.test(tok) && (tok.length < 4 || tok.length > 8)) continue
+    const around = hay.slice(Math.max(0, m.index! - 80), m.index! + tok.length + 20)
+    if (CODE_HINT.test(around)) out.add(tok)
+    if (out.size >= 3) break
+  }
+  return [...out]
+}
+
+/** Game keys like Steam's XXXXX-XXXXX-XXXXX (also 4×4 and 5×5 groups). */
+export function extractGameKeys(text: string): string[] {
+  const re = /\b(?:[A-Z0-9]{5}(?:-[A-Z0-9]{5}){2,4}|[A-Z0-9]{4}(?:-[A-Z0-9]{4}){3})\b/g
+  return [...new Set([...text.matchAll(re)].map((m) => m[0]).filter((k) => /\d/.test(k) && /[A-Z]/.test(k)))].slice(0, 10)
+}
+
+/** Categories a message falls into, by the user's rules (case-insensitive "contains"). */
+export function categorize(m: Pick<MailSummary, 'from' | 'to' | 'subject'>, rules: MailRule[]): string[] {
+  const hit = new Set<string>()
+  for (const r of rules) {
+    const needle = r.contains.trim().toLowerCase()
+    if (!needle) continue
+    const hay =
+      r.field === 'from'
+        ? `${m.from.name} ${m.from.address}`
+        : r.field === 'to'
+          ? m.to.map((a) => `${a.name} ${a.address}`).join(' ')
+          : m.subject
+    if (hay.toLowerCase().includes(needle)) hit.add(r.categoryId)
+  }
+  return [...hit]
 }
