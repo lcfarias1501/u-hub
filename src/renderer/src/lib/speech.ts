@@ -81,7 +81,9 @@ const QUALITY = /premium|enhanced|aprimorad|natural|neural|siri/i
 const NOVELTY =
   /^(albert|bad news|más notícias|bahh|bells|sinos|boing|bubbles|borbulhar|cellos|violoncelos|deranged|good news|boas notícias|hysterical|jester|organ|órgão|pipe organ|princess|superstar|superestrela|trinoids|whisper|sussurro|wobble|oscilador|zarvox)$/i
 /** Eloquence ("Eddy (português (Brasil))") and the 90s voices: fine, but robotic next to Luciana/Joana. */
-const ROBOTIC = /\(.*\)|^(fred|ralph|kathy|junior|júnior)$/i
+const ROBOTIC = /\(.*\(.*\)\)|^(fred|ralph|kathy|junior|júnior)$/i
+/** Downloaded higher-quality voices: "Luciana (Aprimorada)", "Felipe (Premium)", Windows "Natural" voices. */
+export const isQuality = (v: SpeechSynthesisVoice): boolean => QUALITY.test(v.name)
 export const isNovelty = (v: SpeechSynthesisVoice): boolean => NOVELTY.test(v.name.trim())
 
 /** The user's chosen voice when it speaks this language; otherwise the best local voice for it. */
@@ -96,7 +98,7 @@ export function pickVoice(lang: string, preferred: string | null): SpeechSynthes
     let s = 0
     if (l === want) s += 4
     else if (base === 'pt' && l === 'pt-br') s += 3 // Brazilian Portuguese unless the page says pt-PT
-    if (QUALITY.test(v.name)) s += 2
+    if (isQuality(v)) s += 3
     if (v.localService) s += 1
     if (ROBOTIC.test(v.name)) s -= 2
     if (isNovelty(v)) s -= 10
@@ -229,10 +231,36 @@ class SpeechEngine {
     if (this.state.index + 1 < this.state.tracks.length) void this.startTrack(this.state.index + 1)
   }
 
-  /** Back to the start of this article, or to the previous one when already near its start. */
+  /** Back to the start of this news item, or to the previous one when already near its start. */
   prev(): void {
     if (this.seg > 1 || this.state.index === 0) this.restartAt(0)
     else void this.startTrack(this.state.index - 1)
+  }
+
+  /** Paragraphs (blocks) of the current item, in reading order. */
+  private blocks(): number[] {
+    return [...new Set(this.segments.map((s) => s.block))]
+  }
+
+  get canSkipBlock(): boolean {
+    const b = this.blocks()
+    return b.indexOf(this.state.block) < b.length - 1 || this.state.index + 1 < this.state.tracks.length
+  }
+
+  /** Next paragraph; past the last one, the next news item. */
+  nextBlock(): void {
+    const b = this.blocks()
+    const target = b[b.indexOf(this.state.block) + 1]
+    if (target === undefined) return this.next()
+    this.restartAt(this.segments.findIndex((s) => s.block === target))
+  }
+
+  /** Start of this paragraph, or the previous one when already at its start. */
+  prevBlock(): void {
+    const b = this.blocks()
+    const first = this.segments.findIndex((s) => s.block === this.state.block)
+    const target = this.seg > first ? this.state.block : (b[b.indexOf(this.state.block) - 1] ?? b[0])
+    this.restartAt(Math.max(0, this.segments.findIndex((s) => s.block === target)))
   }
 
   /** Jumps to a paragraph of the article being read. */

@@ -242,6 +242,12 @@ function registerIpc(): void {
   ipcMain.handle('news:refresh', () => refreshNews())
   ipcMain.handle('news:discover', (_e, input: string) => discoverFeed(String(input)))
   ipcMain.handle('news:article', (_e, url: string) => readArticle(String(url)))
+  // Where the OS lets you download better (Enhanced/Premium/Natural) voices.
+  ipcMain.handle('news:voiceSettings', () =>
+    shell.openExternal(
+      process.platform === 'darwin' ? 'x-apple.systempreferences:com.apple.preference.universalaccess?SpokenContent' : process.platform === 'win32' ? 'ms-settings:speech' : 'https://github.com/lcfarias1501/u-hub'
+    )
+  )
 
   ipcMain.handle('launcher:run', (_e, id: string) => {
     const l = getValue('launchers').find((x) => x.id === id)

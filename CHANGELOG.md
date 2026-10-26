@@ -20,14 +20,16 @@ com os grupos **Adicionado**, **Melhorado** e **Corrigido**.
   - Notificação de e-mail novo em tempo real, por conta: todos, só das categorias que notificam, ou nenhum.
 - **Notícias** virou um módulo próprio, separado de Ofertas:
   - Categorias além de jogos: Tecnologia, Mundo, Esportes, Música, Cinema & Séries, Ciência e Economia, cada uma com fontes brasileiras e portuguesas já configuradas. Escolha quais seguir.
-  - **Ouvir as notícias**: o U-Hub lê em voz alta uma matéria inteira ou um jornal falado com as manchetes (ou as matérias completas) da categoria. Barra de reprodução com pausar, pular, voltar, velocidade e escolha de voz, que continua tocando em qualquer tela. A rádio abaixa sozinha enquanto ele fala.
+  - **Ouvir as notícias**: o U-Hub lê em voz alta uma matéria inteira ou um jornal falado com as manchetes (ou as matérias completas) da categoria. Ao ouvir uma matéria, as seguintes da lista entram na fila. Barra de reprodução com pausar, parágrafo anterior/próximo, notícia anterior/próxima, velocidade e escolha de voz, que continua tocando em qualquer tela; o leitor acompanha a matéria que está sendo lida. A rádio abaixa sozinha enquanto ele fala.
   - **Leitor dentro do app**: abre a matéria em modo leitura, sem anúncios. O parágrafo que está sendo lido fica destacado, e dá para ouvir a partir de qualquer parágrafo. Quando o site não permite, mostra o resumo com "Abrir no site".
   - **Adicionar fonte é só colar o endereço do site**: o U-Hub encontra o feed sozinho, mostra as últimas manchetes e você escolhe a categoria. Feeds Atom agora também funcionam.
   - Notícias e patch notes dos seus jogos da Steam continuam em Jogos, com os filtros Patches e Meus jogos.
 - **Apresentação**: escolha dos assuntos de notícias na etapa de conexões.
 
 ### Melhorado
+- **Apresentação**: a escolha de módulos foi redesenhada em três grupos (Jogos, Seu dia, PC & mídia), com "marcar todos" por grupo, e cabe na tela sem rolar.
 - **Ofertas** ficou só com jogos grátis, promoções e lista de desejos.
+- Vozes baixadas no sistema ("Aprimorada", "Premium", "Natural") são escolhidas automaticamente e marcadas com ★; um botão leva às configurações do sistema para baixá-las.
 - Notícias atualizam a cada 30 minutos (antes, 3 horas) e na hora em que você segue uma categoria ou adiciona uma fonte.
 - Títulos de notícias com acentos e símbolos aparecem certos em sites que usam outra codificação de texto.
 

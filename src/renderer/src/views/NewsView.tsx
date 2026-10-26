@@ -41,6 +41,17 @@ export function NewsView() {
   const sp = useSpeech()
   const playingId = sp.status !== 'idle' ? sp.tracks[sp.index]?.item.id : undefined
 
+  // The reader follows the queue: when the article on screen ends, show the next one being read.
+  const lastPlaying = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    const track = sp.tracks[sp.index]
+    const prev = lastPlaying.current
+    if (playingId && prev && playingId !== prev && track?.full) {
+      setSelected((cur) => (cur?.id === prev ? track.item : cur))
+    }
+    lastPlaying.current = playingId
+  }, [playingId, sp.tracks, sp.index])
+
   useEffect(() => {
     void window.uhub.news.get().then((s) => {
       setSnap(s)
@@ -78,9 +89,12 @@ export function NewsView() {
     const start = from ? Math.max(0, pool.findIndex((n) => n.id === from.id)) : 0
     speech.play(pool.map((item): Track => ({ item, full })), start)
   }
-  const listenOne = (item: NewsItem): void => {
+  /** One article in full, then the ones after it in this list, so "next" has somewhere to go. */
+  const listenFrom = (item: NewsItem, fromBlock = -1): void => {
     setSelected(item)
-    speech.play([{ item, full: true }])
+    const at = shown.findIndex((n) => n.id === item.id)
+    const queue = at < 0 ? [item] : shown.slice(at, at + 10)
+    speech.play(queue.map((n): Track => ({ item: n, full: true })), 0, fromBlock)
   }
 
   return (
@@ -173,7 +187,7 @@ export function NewsView() {
                 active={selected?.id === n.id}
                 reading={playingId === n.id ? sp.status : null}
                 onOpen={() => setSelected(n)}
-                onListen={() => listenOne(n)}
+                onListen={() => listenFrom(n)}
               />
             ))
           )}
@@ -183,7 +197,7 @@ export function NewsView() {
       {/* ── Right: reader, or the spoken briefing ── */}
       <section className="min-h-0 overflow-y-auto">
         {selected ? (
-          <Reader key={selected.id} item={selected} onClose={() => setSelected(null)} />
+          <Reader key={selected.id} item={selected} onListen={listenFrom} onClose={() => setSelected(null)} />
         ) : (
           <Briefing items={shown} label={catLabel} onListen={listen} onOpen={setSelected} />
         )}
@@ -374,7 +388,7 @@ function Briefing({ items, label, onListen, onOpen }: { items: NewsItem[]; label
 
 // ── Reader ───────────────────────────────────────────────────────────────────
 
-function Reader({ item, onClose }: { item: NewsItem; onClose: () => void }) {
+function Reader({ item, onListen, onClose }: { item: NewsItem; onListen: (item: NewsItem, fromBlock?: number) => void; onClose: () => void }) {
   const sp = useSpeech()
   const [article, setArticle] = useState<ArticleContent | null>(null)
   const [heroOk, setHeroOk] = useState(true)
@@ -399,7 +413,7 @@ function Reader({ item, onClose }: { item: NewsItem; onClose: () => void }) {
   const listen = (fromBlock = -1): void => {
     if (isThis && fromBlock < 0) return speech.toggle()
     if (reading && fromBlock >= 0) return speech.seekBlock(fromBlock)
-    speech.play([{ item, full: true }], 0, fromBlock)
+    onListen(item, fromBlock)
   }
 
   return (

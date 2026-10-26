@@ -1,7 +1,7 @@
-import { Gauge, Loader2, Mic2, Pause, Play, SkipBack, SkipForward, Square } from 'lucide-react'
+import { ChevronsLeft, ChevronsRight, Download, Gauge, Loader2, Mic2, Pause, Play, SkipBack, SkipForward, Square } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useSettings } from '@renderer/lib/settings'
-import { isNovelty, speech, useSpeech, voices as listVoices } from '@renderer/lib/speech'
+import { isNovelty, isQuality, speech, useSpeech, voices as listVoices } from '@renderer/lib/speech'
 import { SpeakingBars } from '@renderer/views/NewsView'
 
 const RATES = [0.8, 1, 1.15, 1.3, 1.5, 1.75, 2]
@@ -38,7 +38,8 @@ export function NewsPlayer({ onOpen }: { onOpen: () => void }) {
   const progress = ((sp.index + within) / sp.tracks.length) * 100
   const usable = voices
     .filter((v) => VOICE_LANGS.some((l) => v.lang.toLowerCase().startsWith(l)) && !isNovelty(v))
-    .sort((a, b) => a.lang.localeCompare(b.lang) || a.name.localeCompare(b.name))
+    .sort((a, b) => a.lang.localeCompare(b.lang) || Number(isQuality(b)) - Number(isQuality(a)) || a.name.localeCompare(b.name))
+  const hasQuality = usable.some((v) => isQuality(v) && v.lang.toLowerCase().startsWith('pt'))
   const nextRate = RATES[(RATES.indexOf(settings.newsRate) + 1) % RATES.length] ?? 1
 
   return (
@@ -65,21 +66,27 @@ export function NewsPlayer({ onOpen }: { onOpen: () => void }) {
       </button>
 
       <div className="flex items-center gap-1">
-        <button className="icon-btn" onClick={() => speech.prev()} title="Voltar">
+        <button className="icon-btn" onClick={() => speech.prev()} title="Notícia anterior (ou início desta)">
           <SkipBack className="size-4" fill="currentColor" />
         </button>
+        <button className="icon-btn" onClick={() => speech.prevBlock()} disabled={sp.status === 'loading'} title="Parágrafo anterior">
+          <ChevronsLeft className="size-4" />
+        </button>
         <button
-          className="grid size-9 place-items-center rounded-full bg-volt text-white transition-transform hover:scale-105 active:scale-95 disabled:opacity-60"
+          className="mx-1 grid size-9 place-items-center rounded-full bg-volt text-white transition-transform hover:scale-105 active:scale-95 disabled:opacity-60"
           onClick={() => speech.toggle()}
           disabled={sp.status === 'loading'}
           title={sp.status === 'paused' ? 'Continuar' : 'Pausar'}
         >
           {sp.status === 'paused' ? <Play className="size-4 translate-x-px" fill="currentColor" /> : <Pause className="size-4" fill="currentColor" />}
         </button>
+        <button className="icon-btn" onClick={() => speech.nextBlock()} disabled={sp.status === 'loading' || !speech.canSkipBlock} title="Próximo parágrafo">
+          <ChevronsRight className="size-4" />
+        </button>
         <button className="icon-btn" onClick={() => speech.next()} disabled={sp.index + 1 >= sp.tracks.length} title="Próxima notícia">
           <SkipForward className="size-4" fill="currentColor" />
         </button>
-        <button className="icon-btn" onClick={() => speech.stop()} title="Parar">
+        <button className="icon-btn ml-1" onClick={() => speech.stop()} title="Parar">
           <Square className="size-3.5" fill="currentColor" />
         </button>
       </div>
@@ -98,11 +105,17 @@ export function NewsPlayer({ onOpen }: { onOpen: () => void }) {
             <option value="">Automática</option>
             {usable.map((v) => (
               <option key={v.voiceURI} value={v.voiceURI}>
-                {v.name.replace(/\s*\(.*\)$/, '')} · {v.lang}
+                {v.name.replace(/\s*\([^()]*\([^()]*\)\)$/, '')} · {v.lang}
+                {isQuality(v) ? ' ★' : ''}
               </option>
             ))}
           </select>
         </label>
+        {!hasQuality && (
+          <button className="icon-btn" onClick={() => void window.uhub.news.voiceSettings()} title="Baixar vozes mais naturais no sistema">
+            <Download className="size-3.5" />
+          </button>
+        )}
       </div>
     </div>
   )

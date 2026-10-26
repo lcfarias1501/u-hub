@@ -229,6 +229,7 @@ const api = {
     refresh: (): Promise<NewsSnapshot> => ipcRenderer.invoke('news:refresh'),
     discover: (input: string): Promise<FeedDiscovery> => ipcRenderer.invoke('news:discover', input),
     article: (url: string): Promise<ArticleContent> => ipcRenderer.invoke('news:article', url),
+    voiceSettings: (): Promise<void> => ipcRenderer.invoke('news:voiceSettings'),
     onUpdate: (cb: (s: NewsSnapshot) => void): (() => void) => {
       const listener = (_: unknown, s: NewsSnapshot): void => cb(s)
       ipcRenderer.on('news:update', listener)

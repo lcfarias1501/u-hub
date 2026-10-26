@@ -39,10 +39,10 @@ type StepId = 'welcome' | 'login' | 'profile' | 'modules' | 'look' | 'connection
 const MODULE_PITCH: Record<ModuleId, string> = {
   performance: 'CPU, memória, rede, bateria e temperatura em tempo real.',
   library: 'Seus jogos da Steam, Epic e outros num só lugar, com tempo de jogo.',
-  radar: 'Jogos grátis da Epic, promoções da Steam e alerta de preço na sua lista de desejos.',
-  news: 'Notícias de jogos, tecnologia, mundo, esportes e mais — e o U-Hub lê elas em voz alta para você.',
+  radar: 'Jogos grátis da Epic, promoções da Steam e alerta de preço.',
+  news: 'Jogos, tecnologia, mundo, esportes e mais, lidas em voz alta para você.',
   friends: 'Adicione amigos e veja em tempo real o que cada um está jogando.',
-  mail: 'Seus e-mails (Gmail, iCloud, outros) organizados por categorias, com códigos de verificação a um clique.',
+  mail: 'Gmail, iCloud e outros, com categorias e códigos de verificação a um clique.',
   vault: 'Senhas, keys e servidores de jogo criptografados no seu computador.',
   media: 'Rádios lofi e synthwave embutidas e controle do Spotify.',
   quests: 'Kanban para builds e tarefas, mais atalhos para abrir apps e pastas.'
@@ -125,7 +125,7 @@ export function Onboarding({ onFinish }: { onFinish: (firstModule: ModuleId) => 
       </header>
 
       <main className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-8 pb-6">
-        <div key={step} className={`w-full max-w-4xl ${dir === 1 ? 'animate-[slide-in_420ms_var(--ease-snap)_both]' : 'animate-[slide-back_420ms_var(--ease-snap)_both]'}`}>
+        <div key={step} className={`w-full ${step === 'modules' ? 'max-w-5xl' : 'max-w-4xl'} ${dir === 1 ? 'animate-[slide-in_420ms_var(--ease-snap)_both]' : 'animate-[slide-back_420ms_var(--ease-snap)_both]'}`}>
           {step === 'welcome' && <Welcome onStart={() => go(1)} onLogin={() => setStep('login')} />}
           {step === 'login' && <LoginStep onBack={() => setStep('welcome')} onDone={() => void finish()} />}
           {step === 'profile' && <ProfileStep profile={profile} setProfile={setProfile} />}
@@ -328,39 +328,98 @@ function ProfileStep({ profile, setProfile }: { profile: Profile; setProfile: Di
   )
 }
 
+/** Modules grouped by what they're for, so nine cards read as three choices. */
+const MODULE_GROUPS: { title: string; hint: string; ids: ModuleId[] }[] = [
+  { title: 'Jogos', hint: 'biblioteca, ofertas e amigos', ids: ['library', 'radar', 'friends'] },
+  { title: 'Seu dia', hint: 'notícias, e-mail e tarefas', ids: ['news', 'mail', 'quests'] },
+  { title: 'PC & mídia', hint: 'sistema, música e senhas', ids: ['performance', 'media', 'vault'] }
+]
+
 function ModulesStep() {
   const { settings, update } = useSettings()
-  const toggle = (id: ModuleId): void => update({ modules: settings.modules.map((m) => (m.id === id ? { ...m, visible: !m.visible } : m)) })
-  const count = settings.modules.filter((m) => m.visible).length
+  const visible = new Set(settings.modules.filter((m) => m.visible).map((m) => m.id))
+  const set = (ids: ModuleId[], on: boolean): void => update({ modules: settings.modules.map((m) => (ids.includes(m.id) ? { ...m, visible: on } : m)) })
+  const all = settings.modules.map((m) => m.id)
+  // Anything added in a later version without a group still shows up.
+  const grouped = new Set(MODULE_GROUPS.flatMap((g) => g.ids))
+  const groups = [...MODULE_GROUPS.map((g) => ({ ...g, ids: g.ids.filter((id) => all.includes(id)) }))]
+  const extra = all.filter((id) => !grouped.has(id))
+  if (extra.length) groups[groups.length - 1] = { ...groups[groups.length - 1], ids: [...groups[groups.length - 1].ids, ...extra] }
+
   return (
-    <Step
-      eyebrow="Módulos"
-      title="O que você quer no seu U-Hub?"
-      text="Escolha os módulos que fazem sentido pra você. Só eles aparecem na barra lateral — dá para mudar quando quiser em Configurações."
-      aside={<div className="font-mono text-[11px] text-zinc-500">{count === 0 ? 'Escolha pelo menos um módulo.' : `${count} de ${settings.modules.length} selecionados`}</div>}
-    >
-      <div className="grid grid-cols-2 gap-3">
-        {settings.modules.map(({ id, visible }) => {
-          const M = MODULES[id]
-          return (
-            <button
-              key={id}
-              onClick={() => toggle(id)}
-              className={`group relative rounded-[6px] border p-4 text-left transition-all duration-200 hover:-translate-y-0.5 ${
-                visible ? 'border-volt/50 bg-volt/[0.09] shadow-[0_10px_30px_-16px_var(--color-volt)]' : 'border-white/[0.07] bg-white/[0.02] hover:border-white/15'
-              }`}
-            >
-              <span className={`absolute top-3 right-3 grid size-5 place-items-center rounded-full border transition-colors ${visible ? 'border-volt bg-volt text-white' : 'border-white/20'}`}>
-                {visible && <Check className="size-3" strokeWidth={3} />}
-              </span>
-              <M.icon className={`mb-3 size-6 transition-colors ${visible ? 'text-volt-soft' : 'text-zinc-500'}`} strokeWidth={1.6} />
-              <div className="text-[14px] font-semibold text-zinc-100">{M.label}</div>
-              <div className="mt-1 text-[12px] leading-snug text-zinc-500">{MODULE_PITCH[id]}</div>
+    <div className="mx-auto max-w-5xl">
+      <div className="mb-7 flex items-end gap-6">
+        <div>
+          <div className="eyebrow mb-2 text-volt-soft">Módulos</div>
+          <h2 className="text-[30px] leading-tight font-semibold tracking-tight text-zinc-50">O que você quer no seu U-Hub?</h2>
+          <p className="mt-2 max-w-xl text-[14px] leading-relaxed text-zinc-400">Só os módulos escolhidos aparecem na barra lateral. Dá para mudar quando quiser em Configurações.</p>
+        </div>
+        <div className="ml-auto flex shrink-0 flex-col items-end gap-2">
+          <span className={`font-mono text-[11px] ${visible.size ? 'text-zinc-400' : 'text-amber-300/80'}`}>
+            {visible.size ? `${visible.size} de ${all.length} selecionados` : 'Escolha pelo menos um'}
+          </span>
+          <div className="flex gap-1.5">
+            <button className="btn h-7 text-[11px]" onClick={() => set(all, true)} disabled={visible.size === all.length}>
+              Todos
             </button>
+            <button className="btn h-7 text-[11px]" onClick={() => set(all, false)} disabled={visible.size === 0}>
+              Nenhum
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-5">
+        {groups.map((g) => {
+          const on = g.ids.filter((id) => visible.has(id)).length
+          return (
+            <section key={g.title}>
+              <div className="mb-2.5 flex items-baseline gap-2 border-b border-white/[0.06] pb-2">
+                <h3 className="text-[13px] font-semibold text-zinc-100">{g.title}</h3>
+                <span className="truncate text-[11px] text-zinc-600">{g.hint}</span>
+                <button
+                  className="ml-auto shrink-0 font-mono text-[10px] text-zinc-500 transition-colors hover:text-volt-100"
+                  onClick={() => set(g.ids, on < g.ids.length)}
+                >
+                  {on < g.ids.length ? 'marcar todos' : 'desmarcar'}
+                </button>
+              </div>
+              <div className="space-y-2">
+                {g.ids.map((id) => {
+                  const M = MODULES[id]
+                  const active = visible.has(id)
+                  return (
+                    <button
+                      key={id}
+                      onClick={() => set([id], !active)}
+                      aria-pressed={active}
+                      className={`group flex w-full items-start gap-3 rounded-[5px] border p-3 text-left transition-all duration-200 ${
+                        active ? 'border-volt/45 bg-volt/[0.08] shadow-[0_8px_24px_-18px_var(--color-volt)]' : 'border-white/[0.06] bg-white/[0.015] hover:border-white/15'
+                      }`}
+                    >
+                      <span
+                        className={`grid size-9 shrink-0 place-items-center rounded-[4px] border transition-colors ${
+                          active ? 'border-volt/30 bg-volt/15 text-volt-soft' : 'border-white/[0.06] bg-black/20 text-zinc-500'
+                        }`}
+                      >
+                        <M.icon className="size-[18px]" strokeWidth={1.7} />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className={`block text-[13px] font-semibold ${active ? 'text-zinc-50' : 'text-zinc-300'}`}>{M.label}</span>
+                        <span className="mt-0.5 line-clamp-2 block text-[11px] leading-snug text-zinc-500">{MODULE_PITCH[id]}</span>
+                      </span>
+                      <span className={`mt-0.5 grid size-4 shrink-0 place-items-center rounded-full border transition-colors ${active ? 'border-volt bg-volt text-white' : 'border-white/20'}`}>
+                        {active && <Check className="size-2.5" strokeWidth={3.5} />}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </section>
           )
         })}
       </div>
-    </Step>
+    </div>
   )
 }
 
