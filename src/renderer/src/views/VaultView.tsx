@@ -1,4 +1,4 @@
-import { Eye, EyeOff, KeyRound, Pencil, Plus, Search, Server, Settings2, ShieldCheck, Trash2 } from 'lucide-react'
+import { Eye, EyeOff, KeyRound, Lock, Pencil, Plus, Search, Server, Settings2, ShieldCheck, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { FALLBACK_CATEGORY_ID, type VaultCategoryDef, type VaultEntry } from '@shared/types'
 import { CopyButton } from '@renderer/components/CopyButton'
@@ -14,6 +14,7 @@ import { PageHeader } from './PageHeader'
 export function VaultView() {
   const [entries, setEntries] = useState<VaultEntry[]>([])
   const [protection, setProtection] = useState<'keychain' | 'local-key' | null>(null)
+  const [locked, setLocked] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [categories, setCategories, categoriesReady] = usePersistentState('vaultCategories', [])
   const [filter, setFilter] = useState<string>('all')
@@ -22,12 +23,13 @@ export function VaultView() {
   const [managing, setManaging] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    void window.uhub.vault.read().then(({ entries, protection }) => {
+  const load = (): void =>
+    void window.uhub.vault.read().then(({ entries, protection, error }) => {
       setEntries(entries)
       setProtection(protection)
+      setLocked(error)
     })
-  }, [])
+  useEffect(load, [])
 
   useModHotkeys({
     k: () => searchRef.current?.focus(),
@@ -69,6 +71,7 @@ export function VaultView() {
   }
 
   if (!categoriesReady) return null
+  if (locked) return <LockedVault reason={locked} onStartOver={load} />
 
   return (
     <div className="animate-rise flex h-full flex-col p-6">
@@ -143,6 +146,41 @@ export function VaultView() {
       {managing && (
         <CategoryManager categories={categories} counts={counts} onChange={setCategories} onDelete={deleteCategory} onClose={() => setManaging(false)} />
       )}
+    </div>
+  )
+}
+
+/** The stored vault can't be decrypted on this machine: never show it as empty (saving would overwrite it). */
+function LockedVault({ reason, onStartOver }: { reason: string; onStartOver: () => void }) {
+  const [confirm, setConfirm] = useState(false)
+  return (
+    <div className="animate-rise grid h-full place-items-center p-6">
+      <div className="panel max-w-lg px-8 py-10 text-center">
+        <Lock className="mx-auto mb-4 size-9 text-amber-300/80" strokeWidth={1.4} />
+        <h2 className="text-[20px] font-semibold text-zinc-50">Vault bloqueado neste computador</h2>
+        <p className="mt-2 text-[13px] leading-relaxed text-zinc-400">{reason}</p>
+        <p className="mt-3 text-[12px] leading-relaxed text-zinc-500">
+          Suas credenciais continuam guardadas e não foram apagadas. Para trazê-las, restaure um backup com Vault em Configurações → Dados & Sobre.
+        </p>
+        <div className="mt-6 flex justify-center gap-2">
+          {confirm ? (
+            <button
+              className="btn !border-rose-400/40 !text-rose-200"
+              onClick={async () => {
+                await window.uhub.vault.startOver()
+                onStartOver()
+              }}
+            >
+              Sim, começar um Vault vazio
+            </button>
+          ) : (
+            <button className="btn" onClick={() => setConfirm(true)}>
+              Começar um Vault vazio
+            </button>
+          )}
+        </div>
+        {confirm && <p className="mt-3 font-mono text-[10px] text-zinc-600">O Vault antigo fica guardado como arquivo na pasta de dados do U-Hub.</p>}
+      </div>
     </div>
   )
 }

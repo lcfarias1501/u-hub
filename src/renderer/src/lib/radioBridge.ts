@@ -47,6 +47,11 @@ export function startRadioBridge(): void {
   window.uhub.radio.publish(snapshot())
 
   window.uhub.radio.onCommand((cmd) => {
+    // Reading news aloud: play/pause and skip act on the reading (volume still goes to the radio).
+    const reading = audioEngine.mediaOverride
+    if (reading && (cmd.type === 'toggle' || cmd.type === 'next' || cmd.type === 'prev')) {
+      return cmd.type === 'toggle' ? reading.toggle() : cmd.type === 'next' ? reading.next() : reading.prev()
+    }
     switch (cmd.type) {
       case 'toggle':
         if (audioEngine.getSnapshot().station) audioEngine.toggle()

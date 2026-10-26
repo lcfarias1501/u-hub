@@ -81,7 +81,8 @@ export function Reader({
   }
 
   const saveKey = async (key: string): Promise<void> => {
-    const { entries } = await window.uhub.vault.read()
+    const { entries, error } = await window.uhub.vault.read()
+    if (error) return alert(`${error}\n\nAbra o Vault para resolver antes de salvar keys.`)
     const from = msg.from.address.toLowerCase()
     const category = from.includes('steam') ? 'steam' : from.includes('battle.net') || from.includes('blizzard') ? 'battlenet' : 'other'
     const entry: VaultEntry = {

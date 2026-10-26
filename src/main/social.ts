@@ -55,6 +55,9 @@ let userId: string | null = null
 let myChannel: RealtimeChannel | null = null
 const friendChannels = new Map<string, RealtimeChannel>()
 const presences = new Map<string, Presence | null>()
+/** When each friend's presence channel was joined: the first syncs only say what was already going on. */
+const presenceJoinedAt = new Map<string, number>()
+const PRESENCE_SETTLE_MS = 15_000
 
 export const socialState = (): SocialState => state
 
@@ -179,7 +182,9 @@ function onFriendPresence(friendId: string, ch: RealtimeChannel): void {
   const now = latestMeta(ch)
   presences.set(friendId, now)
   const friend = state.friends.find((f) => f.profile.id === friendId)
-  if (friend && now?.status === 'playing' && now.game && before?.game?.name !== now.game.name) {
+  const first = Date.now() - (presenceJoinedAt.get(friendId) ?? 0) < PRESENCE_SETTLE_MS
+  // Only a game started while we're watching is news; on app start everyone already playing would notify at once.
+  if (!first && friend && now?.status === 'playing' && now.game && before?.game?.name !== now.game.name) {
     notify({ kind: 'social', title: `${friend.profile.displayName} está jogando`, body: now.game.name, image: now.game.cover, view: 'friends' })
   }
   set({ friends: sortFriends(state.friends.map((f) => (f.profile.id === friendId ? { ...f, presence: now } : f))) })
@@ -193,11 +198,13 @@ function syncFriendChannels(ids: string[]): void {
       void client.removeChannel(ch)
       friendChannels.delete(id)
       presences.delete(id)
+      presenceJoinedAt.delete(id)
     }
   }
   for (const id of ids) {
     if (friendChannels.has(id)) continue
     const ch = client.channel(`presence:${id}`, { config: { private: true } })
+    presenceJoinedAt.set(id, Date.now())
     ch.on('presence', { event: 'sync' }, () => onFriendPresence(id, ch)).subscribe()
     friendChannels.set(id, ch)
   }
@@ -251,6 +258,7 @@ async function stop(): Promise<void> {
   await client.removeAllChannels()
   friendChannels.clear()
   presences.clear()
+  presenceJoinedAt.clear()
   myChannel = null
   userId = null
   accountListeners.forEach((l) => l(null))

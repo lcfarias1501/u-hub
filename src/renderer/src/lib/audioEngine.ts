@@ -24,6 +24,8 @@ class AudioEngine {
   private listeners = new Set<() => void>()
   /** Lowered while news are being read aloud; never touches the user's volume. */
   private ducked = false
+  /** While news are read aloud, the media keys drive the reading instead of the radio. */
+  mediaOverride: { toggle: () => void; next: () => void; prev: () => void } | null = null
   /** Station skipping needs the station list, which the radio bridge provides. */
   skip: ((dir: 1 | -1) => void) | null = null
 
@@ -40,11 +42,11 @@ class AudioEngine {
 
     // macOS "Now Playing" / Windows media overlay and the keyboard media keys.
     const ms = navigator.mediaSession
-    ms.setActionHandler('play', () => this.state.station && void this.play(this.state.station))
-    ms.setActionHandler('pause', () => this.pause())
+    ms.setActionHandler('play', () => (this.mediaOverride ? this.mediaOverride.toggle() : this.state.station && void this.play(this.state.station)))
+    ms.setActionHandler('pause', () => (this.mediaOverride ? this.mediaOverride.toggle() : this.pause()))
     ms.setActionHandler('stop', () => this.stop())
-    ms.setActionHandler('nexttrack', () => this.skip?.(1))
-    ms.setActionHandler('previoustrack', () => this.skip?.(-1))
+    ms.setActionHandler('nexttrack', () => (this.mediaOverride ? this.mediaOverride.next() : this.skip?.(1)))
+    ms.setActionHandler('previoustrack', () => (this.mediaOverride ? this.mediaOverride.prev() : this.skip?.(-1)))
   }
 
   private patch(p: Partial<AudioState>): void {

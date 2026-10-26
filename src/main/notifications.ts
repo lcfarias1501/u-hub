@@ -1,12 +1,14 @@
 import { randomUUID } from 'node:crypto'
 import { Notification, app, shell, type BrowserWindow } from 'electron'
-import type { AppNotification } from '@shared/types'
+import type { AppNotification, ViewId } from '@shared/types'
 import { snapshot as librarySnapshot } from './games'
 import { getSettings, getValue, onSettingsChange, onValueChange, setValue } from './storage'
 
 const MAX_KEPT = 200
 
 let getWin: () => BrowserWindow | null = () => null
+/** Shows the main window (recreating it if it was closed) on a view. */
+let openMain: (view?: ViewId) => void = () => undefined
 
 /** Dock (macOS) / taskbar (Linux) badge with the unread count, if enabled. */
 function syncBadge(): void {
@@ -14,8 +16,9 @@ function syncBadge(): void {
   app.setBadgeCount(unread)
 }
 
-export function initNotifications(win: () => BrowserWindow | null): void {
+export function initNotifications(win: () => BrowserWindow | null, open: (view?: ViewId) => void): void {
   getWin = win
+  openMain = open
   syncBadge()
   // The renderer marks items read / clears them by writing the list.
   onValueChange('notifications', syncBadge)
@@ -37,13 +40,9 @@ export function notify(n: Omit<AppNotification, 'id' | 'createdAt' | 'read'>): A
   if (prefs.system[n.kind] && !gaming && Notification.isSupported()) {
     const sys = new Notification({ title: n.title, body: n.body, silent: !prefs.sound })
     sys.on('click', () => {
-      const win = getWin()
       markRead(entry.id)
-      if (n.view && win) {
-        win.show()
-        win.focus()
-        win.webContents.send('nav:go', n.view)
-      } else if (n.url) void shell.openExternal(n.url)
+      if (n.view) openMain(n.view)
+      else if (n.url) void shell.openExternal(n.url)
     })
     sys.show()
   }

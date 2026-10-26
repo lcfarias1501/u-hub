@@ -60,9 +60,10 @@ const api = {
     }
   },
   vault: {
-    read: (): Promise<{ entries: VaultEntry[]; protection: 'keychain' | 'local-key' }> =>
-      ipcRenderer.invoke('vault:read'),
-    write: (entries: VaultEntry[]): Promise<void> => ipcRenderer.invoke('vault:write', entries)
+    /** `error` set = the stored vault exists but can't be decrypted here; writes are refused until startOver. */
+    read: (): Promise<{ entries: VaultEntry[]; protection: 'keychain' | 'local-key'; error: string | null }> => ipcRenderer.invoke('vault:read'),
+    write: (entries: VaultEntry[]): Promise<void> => ipcRenderer.invoke('vault:write', entries),
+    startOver: (): Promise<string | null> => ipcRenderer.invoke('vault:startOver')
   },
   clipboard: {
     copy: (text: string, sensitive = false): Promise<void> => ipcRenderer.invoke('clipboard:copy', text, sensitive)
@@ -92,6 +93,8 @@ const api = {
     info: (): Promise<AppInfo> => ipcRenderer.invoke('app:info'),
     openDataFolder: (): Promise<string> => ipcRenderer.invoke('app:openDataFolder'),
     reset: (): Promise<void> => ipcRenderer.invoke('app:reset'),
+    /** View a notification asked for while the window was closed (macOS), once. */
+    takePendingView: (): Promise<ModuleId | 'settings' | null> => ipcRenderer.invoke('app:takePendingView'),
     /** Navigation requested from outside the page (tray menu). */
     onNavigate: (cb: (view: ModuleId | 'settings') => void): (() => void) => {
       const listener = (_: unknown, v: ModuleId | 'settings'): void => cb(v)
@@ -109,6 +112,8 @@ const api = {
       return () => ipcRenderer.off('radio:state', listener)
     },
     command: (cmd: RadioCommand): void => ipcRenderer.send('radio:command', cmd),
+    /** News text-to-speech running: global media shortcuts should go to the main window, not Spotify. */
+    setSpeaking: (on: boolean): void => ipcRenderer.send('speech:active', on),
     onCommand: (cb: (cmd: RadioCommand) => void): (() => void) => {
       const listener = (_: unknown, c: RadioCommand): void => cb(c)
       ipcRenderer.on('radio:command', listener)

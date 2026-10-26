@@ -1,6 +1,6 @@
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { BrowserWindow } from 'electron'
-import type { AppSettings, StoreKey, SyncStatus } from '@shared/types'
+import type { AppSettings, StoreKey, SyncStatus, WishlistItem } from '@shared/types'
 import { onAccountChange, supabaseClient } from './social'
 import { getPrivate, getValue, onAnyValueChange, setPrivate, setValue } from './storage'
 
@@ -52,8 +52,21 @@ function setStatus(patch: Partial<SyncStatus>): void {
 
 const isSyncKey = (k: string): k is SyncKey => (SYNC_KEYS as readonly string[]).includes(k)
 
+/**
+ * Wishlist prices are per machine: each PC fetches them in its own store region,
+ * so only the list and the alert targets (with the currency they're in) travel.
+ */
+const PRICE_FIELDS = ['final', 'initial', 'discount', 'lowest', 'checkedAt'] as const
+
 function outgoing(key: SyncKey): unknown {
   const v = getValue(key)
+  if (key === 'wishlist') {
+    return (v as WishlistItem[]).map((w) => {
+      const copy: Record<string, unknown> = { ...w }
+      for (const f of PRICE_FIELDS) delete copy[f]
+      return copy
+    })
+  }
   if (key !== 'settings') return v
   const copy: Record<string, unknown> = { ...(v as AppSettings) }
   for (const k of DEVICE_SETTINGS) delete copy[k]
@@ -61,6 +74,17 @@ function outgoing(key: SyncKey): unknown {
 }
 
 function incoming(key: SyncKey, value: unknown): unknown {
+  if (key === 'wishlist') {
+    const local = new Map(getValue('wishlist').map((w) => [w.appid, w]))
+    return (value as WishlistItem[]).map((r): WishlistItem => {
+      const l = local.get(r.appid)
+      // New here: no prices yet (fetched on the next refresh, in this PC's currency).
+      if (!l) return { ...r, final: null, initial: null, discount: 0, lowest: null, checkedAt: null }
+      // A target set in another currency means nothing here; keep this PC's own.
+      const sameCurrency = !l.currency || !r.currency || l.currency === r.currency
+      return { ...r, currency: l.currency ?? r.currency, target: sameCurrency ? r.target : l.target, final: l.final, initial: l.initial, discount: l.discount, lowest: l.lowest, checkedAt: l.checkedAt }
+    })
+  }
   if (key !== 'settings') return value
   const local = getValue('settings')
   const merged: Record<string, unknown> = { ...(value as object) }
@@ -189,6 +213,8 @@ export function startSync(win: () => BrowserWindow | null): void {
   getWin = win
   onAnyValueChange((key) => {
     if (applying || !isSyncKey(key)) return
+    // Background writes that don't change what would be uploaded (wishlist price checks) aren't edits.
+    if (remote[key] && JSON.stringify(outgoing(key)) === JSON.stringify(remote[key]!.value)) return
     setPrivate('syncMeta', { ...getPrivate('syncMeta'), [key]: Date.now() })
     if (uid && status.state !== 'conflict') schedulePush()
   })

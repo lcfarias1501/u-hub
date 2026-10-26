@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { BrowserWindow, app, clipboard, dialog, globalShortcut, ipcMain, session, shell } from 'electron'
-import type { AppInfo, MailAccount, MailDraft, SpotifyCommand, StoreSchema, VaultEntry } from '@shared/types'
+import type { AppInfo, MailAccount, MailDraft, SpotifyCommand, StoreSchema, VaultEntry, ViewId } from '@shared/types'
 import { exportBackup, inspectBackup, restoreBackup } from './backup'
 import { discordStatus, startDiscord, stopDiscord } from './discord'
 import { applyShortcuts, initShortcuts, pauseShortcuts, shortcutStatus } from './shortcuts'
@@ -15,7 +15,7 @@ import { discoverFeed, newsSnapshot, readArticle, refreshNews, startNews } from 
 import { launch } from './launcher'
 import { applySettings, canOpenAtLogin, quitting, showWindow } from './shellIntegration'
 import * as spotify from './spotify'
-import { getSettings, getValue, isPublicKey, onAnyValueChange, onSettingsChange, readVault, resetStore, setValue, vaultProtection, writeVault } from './storage'
+import { getSettings, getValue, isPublicKey, onAnyValueChange, onSettingsChange, quarantineVault, readVault, resetStore, setValue, vaultError, vaultProtection, writeVault } from './storage'
 import { readStatic, startMonitor } from './system'
 import { applyUpdate, checkNow, startUpdater, updaterStatus } from './updater'
 
@@ -92,6 +92,25 @@ function createWindow(): void {
  * before an AnalyserNode can read samples for the visualizer. Media responses get
  * an ACAO header so `crossOrigin="anonymous"` audio plays and stays analysable.
  */
+/**
+ * Brings the main window up on `view`. On macOS the window may have been closed
+ * (app still running in the Dock): it's recreated, and the view is sent once it loads.
+ */
+let pendingView: ViewId | null = null
+
+function openMain(view?: ViewId): void {
+  if (!win) {
+    // The new page asks for this view when it boots (app:takePendingView).
+    pendingView = view ?? null
+    createWindow()
+    const created = win as BrowserWindow | null
+    created?.once('ready-to-show', () => showWindow(created))
+    return
+  }
+  showWindow(win)
+  if (view) win.webContents.send('nav:go', view)
+}
+
 function configureMediaRequests(): void {
   session.defaultSession.webRequest.onBeforeSendHeaders((details, cb) => {
     if (details.resourceType !== 'media') return cb({})
@@ -120,7 +139,11 @@ function registerIpc(): void {
     setValue(key, value as StoreSchema[typeof key])
   })
 
-  ipcMain.handle('vault:read', () => ({ entries: readVault(), protection: vaultProtection() }))
+  ipcMain.handle('vault:read', () => {
+    const error = vaultError()
+    return { entries: error ? [] : readVault(), protection: vaultProtection(), error }
+  })
+  ipcMain.handle('vault:startOver', () => quarantineVault())
   ipcMain.handle('vault:write', (_e, entries: VaultEntry[]) => writeVault(entries))
 
   // Secrets are wiped from the clipboard after 30s unless the user copied something else meanwhile.
@@ -157,6 +180,11 @@ function registerIpc(): void {
       localeCountry: app.getLocaleCountryCode() || 'BR'
     })
   )
+  ipcMain.handle('app:takePendingView', () => {
+    const v = pendingView
+    pendingView = null
+    return v
+  })
   ipcMain.handle('app:openDataFolder', () => shell.openPath(app.getPath('userData')))
   ipcMain.handle('app:reset', () => {
     resetStore()
@@ -171,13 +199,7 @@ function registerIpc(): void {
     applySettings(getSettings(), () => win)
   })
 
-  registerPopoverIpc(
-    () => win,
-    (view) => {
-      showWindow(win)
-      if (view) win?.webContents.send('nav:go', view)
-    }
-  )
+  registerPopoverIpc(() => win, openMain)
 
   ipcMain.handle('library:get', () => librarySnapshot())
   ipcMain.handle('library:scan', () => scanLibrary())
@@ -262,7 +284,7 @@ app.whenReady().then(() => {
   startUpdater(() => win)
   // Keep every window's copy of stored values fresh when main (or another window) writes them.
   onAnyValueChange((key) => BrowserWindow.getAllWindows().forEach((w) => w.webContents.send('store:changed', key)))
-  initNotifications(() => win)
+  initNotifications(() => win, openMain)
   startLibrary()
   startRadar(() => win)
   startNews(() => win)

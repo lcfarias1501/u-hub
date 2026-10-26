@@ -133,6 +133,12 @@ class SpeechEngine {
   private patch(p: Partial<SpeechState>): void {
     this.state = { ...this.state, ...p }
     audioEngine.duck(this.state.status === 'speaking' || this.state.status === 'loading')
+    // Media keys and the global play/pause shortcut follow the reading while it runs.
+    const active = this.state.status !== 'idle'
+    if (active !== !!audioEngine.mediaOverride) {
+      audioEngine.mediaOverride = active ? { toggle: () => this.toggle(), next: () => this.next(), prev: () => this.prev() } : null
+      window.uhub.radio.setSpeaking(active)
+    }
     this.listeners.forEach((l) => l())
   }
 

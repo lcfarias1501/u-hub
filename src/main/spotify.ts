@@ -212,6 +212,13 @@ async function api<T>(method: string, path: string, body?: unknown): Promise<T |
   const json = parseBody(await res.text())
   if (!res.ok) {
     const e = (json as { error?: { message?: string; reason?: string } } | null)?.error
+    // Apps in Spotify's Development mode only work for accounts added under "User Management".
+    if (res.status === 403 && /not be registered|not registered/i.test(e?.message ?? '')) {
+      throw new SpotifyError(
+        'Esta conta do Spotify não está liberada no app do U-Hub. O dono do app precisa adicionar seu e-mail do Spotify em developer.spotify.com → app → User Management (limite de 25 pessoas), ou use seu próprio Client ID.',
+        'NOT_REGISTERED'
+      )
+    }
     throw new SpotifyError(e?.message ?? `HTTP ${res.status}`, e?.reason ?? (res.status === 401 ? 'NOT_CONNECTED' : undefined))
   }
   return json as T

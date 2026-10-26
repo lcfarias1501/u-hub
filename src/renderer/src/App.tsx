@@ -71,6 +71,8 @@ function Shell() {
     const wanted = settings.startView === 'last' ? lastView : settings.startView
     setViewState(wanted !== 'settings' && modules.includes(wanted) ? wanted : modules[0])
     if (settings.sidebarMode !== 'remember') setCollapsed(settings.sidebarMode === 'collapsed')
+    // Reopened by clicking a notification: go where it points.
+    void window.uhub.app.takePendingView().then((v) => v && (v === 'settings' || modules.includes(v)) && setView(v))
   }, [ready])
 
   // If the current module gets hidden in Settings, fall back to the first visible one.

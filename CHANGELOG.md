@@ -33,6 +33,18 @@ com os grupos **Adicionado**, **Melhorado** e **Corrigido**.
 - Notícias atualizam a cada 30 minutos (antes, 3 horas) e na hora em que você segue uma categoria ou adiciona uma fonte.
 - Títulos de notícias com acentos e símbolos aparecem certos em sites que usam outra codificação de texto.
 
+### Corrigido
+- **Vault**: se o Vault salvo não puder ser aberto neste computador (pasta de dados vinda de outro computador ou usuário), ele aparece como bloqueado em vez de vazio. Antes, salvar uma credencial nova nessa situação apagava as antigas. Restaurar um backup resolve; "Começar um Vault vazio" guarda o antigo como arquivo.
+- **Lista de desejos** com conta em dois computadores de regiões diferentes: os preços ficam por computador e o preço-alvo não é mais zerado pelo outro computador.
+- **Spotify**: contas não liberadas no app do Spotify (modo de desenvolvimento) mostram o que fazer, em vez de um erro técnico.
+- **E-mail**: notificações duplicadas quando chegavam vários e-mails seguidos; vários de uma vez viram uma notificação só.
+- **E-mail**: e-mails que chegam enquanto a conexão caiu (suspensão, Wi-Fi) agora são notificados quando ela volta.
+- **E-mail**: as categorias procuram na caixa de entrada inteira, não só nos 40 e-mails mais recentes.
+- **E-mail**: editar uma conta não causa mais uma reconexão extra 30 segundos depois.
+- **Amigos**: abrir o app não dispara mais uma notificação "está jogando" para cada amigo que já estava jogando.
+- Clicar numa notificação depois de fechar a janela (Mac) reabre o U-Hub na tela certa.
+- Teclas de mídia e o atalho de tocar/pausar controlam a leitura das notícias enquanto ela está tocando.
+
 ## [0.7.0] - 2026-10-25
 
 ### Adicionado

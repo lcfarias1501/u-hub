@@ -235,9 +235,35 @@ export function readVault(): VaultEntry[] {
   return JSON.parse(decrypt(blob, mode)) as VaultEntry[]
 }
 
+/**
+ * Null when the vault opens; otherwise why not. It fails when the OS keychain
+ * entry changed (another user account, a reinstalled OS, data folder copied from
+ * another computer) — the encrypted data is still there, just not readable here.
+ */
+export function vaultError(): string | null {
+  try {
+    readVault()
+    return null
+  } catch {
+    return 'O Vault deste computador não pôde ser aberto com o chaveiro do sistema (a pasta de dados pode ter vindo de outro computador ou usuário).'
+  }
+}
+
 export function writeVault(entries: VaultEntry[]): void {
+  // Writing over a vault we couldn't read would destroy it; the user must choose "start over" explicitly.
+  if (vaultError()) throw new Error('Vault bloqueado: não é possível salvar sem abrir o Vault atual.')
   const { blob, mode } = encrypt(JSON.stringify(entries))
   store.set({ vaultBlob: blob, vaultMode: mode })
+}
+
+/** Moves an unreadable vault aside (kept as a file in the data folder) and starts an empty one. */
+export function quarantineVault(): string | null {
+  const blob = store.get('vaultBlob')
+  if (!blob) return null
+  const file = join(app.getPath('userData'), `vault-ilegivel-${new Date().toISOString().slice(0, 10)}-${Date.now()}.json`)
+  writeFileSync(file, JSON.stringify({ vaultBlob: blob, vaultMode: store.get('vaultMode') }), { mode: 0o600 })
+  store.set({ vaultBlob: null, vaultMode: null })
+  return file
 }
 
 export function vaultProtection(): 'keychain' | 'local-key' {

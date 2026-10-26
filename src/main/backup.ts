@@ -2,7 +2,7 @@ import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:
 import { readFile, writeFile } from 'node:fs/promises'
 import { app, dialog, type BrowserWindow } from 'electron'
 import type { BackupSummary, StoreKey, StoreSchema, VaultEntry } from '@shared/types'
-import { BACKUP_KEYS, getValue, isPublicKey, readVault, setValue, writeVault } from './storage'
+import { BACKUP_KEYS, getValue, isPublicKey, quarantineVault, readVault, setValue, vaultError, writeVault } from './storage'
 
 const FORMAT = 'u-hub-backup'
 
@@ -46,6 +46,7 @@ function unseal(v: SealedVault, password: string): VaultEntry[] {
 }
 
 export async function exportBackup(win: BrowserWindow | null, password: string | null): Promise<{ ok: boolean; path?: string }> {
+  if (password && vaultError()) throw new Error('O Vault está bloqueado neste computador. Exporte o backup sem incluir o Vault.')
   const date = new Date().toISOString().slice(0, 10)
   const opts = { defaultPath: `u-hub-backup-${date}.json`, filters: [{ name: 'Backup do U-Hub', extensions: ['json'] }] }
   const { canceled, filePath } = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts)
@@ -105,6 +106,10 @@ export function restoreBackup(password: string | null): void {
   for (const [key, value] of Object.entries(file.data)) {
     if (isPublicKey(key) && value !== undefined) setValue(key as StoreKey, value as StoreSchema[StoreKey])
   }
-  if (vault) writeVault(vault)
+  if (vault) {
+    // A locked (unreadable) vault is set aside rather than lost; the backup replaces it.
+    if (vaultError()) quarantineVault()
+    writeVault(vault)
+  }
   pending = null
 }

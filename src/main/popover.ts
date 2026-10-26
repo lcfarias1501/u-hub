@@ -74,6 +74,10 @@ export const onRadioChange = (l: (s: RadioState) => void): void => void radioLis
 /** Last radio state published by the main window. */
 export const radioState = (): RadioState => radio
 
+let speaking = false
+/** News are being read aloud in the main window. */
+export const speechActive = (): boolean => speaking
+
 export function hide(): void {
   if (popover?.isVisible()) {
     popover.hide()
@@ -111,6 +115,9 @@ export function registerPopoverIpc(getMain: () => BrowserWindow | null, showMain
     radioListeners.forEach((l) => l(state))
   })
   ipcMain.handle('radio:get', () => radio)
+  ipcMain.on('speech:active', (_e, on: boolean) => {
+    speaking = !!on
+  })
   ipcMain.on('radio:command', (_e, cmd: RadioCommand) => getMain()?.webContents.send('radio:command', cmd))
   ipcMain.on('popover:hide', () => hide())
   ipcMain.on('app:showMain', (_e, view?: ModuleId | 'settings') => {

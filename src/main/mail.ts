@@ -35,8 +35,13 @@ interface Conn {
   worker: ImapFlow | null
   watcher: ImapFlow | null
   status: MailAccountStatus
+  /** Highest INBOX uid already seen, and the UIDVALIDITY it belongs to (uids reset if it changes). */
   lastUid: number
+  uidValidity: bigint | null
   retry?: NodeJS.Timeout
+  /** New-mail handling runs one at a time; EXISTS events arriving meanwhile just ask for another pass. */
+  checking?: boolean
+  checkAgain?: boolean
 }
 
 const conns = new Map<string, Conn>()
@@ -130,14 +135,17 @@ async function disconnect(id: string): Promise<void> {
   const c = conns.get(id)
   if (!c) return
   clearTimeout(c.retry)
-  await Promise.allSettled([c.worker?.logout(), c.watcher?.logout()])
+  c.retry = undefined
+  // Detach first: the 'close' these logouts cause is intentional, not a dropped connection.
+  const { worker: w, watcher: x } = c
   c.worker = null
   c.watcher = null
+  await Promise.allSettled([w?.logout(), x?.logout()])
 }
 
 async function connect(account: MailAccount): Promise<void> {
   const pass = password(account.id)
-  const c: Conn = conns.get(account.id) ?? { account, worker: null, watcher: null, status: { id: account.id, state: 'connecting', error: null, unread: 0 }, lastUid: 0 }
+  const c: Conn = conns.get(account.id) ?? { account, worker: null, watcher: null, status: { id: account.id, state: 'connecting', error: null, unread: 0 }, lastUid: 0, uidValidity: null }
   c.account = account
   conns.set(account.id, c)
   if (!pass) {
@@ -148,18 +156,25 @@ async function connect(account: MailAccount): Promise<void> {
   emitStatus()
 
   try {
-    c.worker = imapClient(account, pass)
-    c.watcher = imapClient(account, pass)
-    for (const cl of [c.worker, c.watcher]) {
+    const worker = imapClient(account, pass)
+    const watcher = imapClient(account, pass)
+    c.worker = worker
+    c.watcher = watcher
+    for (const cl of [worker, watcher]) {
       cl.on('error', () => undefined)
-      cl.on('close', () => scheduleReconnect(account.id))
+      // Only a connection that is still in use counts as dropped (see disconnect()).
+      cl.on('close', () => (c.worker === cl || c.watcher === cl) && scheduleReconnect(account.id))
     }
-    await Promise.all([c.worker.connect(), c.watcher.connect()])
+    await Promise.all([worker.connect(), watcher.connect()])
 
     // Watcher: stays on INBOX; IDLE kicks in automatically when idle.
-    const box = await c.watcher.mailboxOpen('INBOX')
-    c.lastUid = Math.max(0, (box.uidNext ?? 1) - 1)
-    c.watcher.on('exists', () => void onNewMail(account.id))
+    const box = await watcher.mailboxOpen('INBOX')
+    const reconnected = c.lastUid > 0 && c.uidValidity === box.uidValidity
+    if (!reconnected) c.lastUid = Math.max(0, (box.uidNext ?? 1) - 1)
+    c.uidValidity = box.uidValidity
+    watcher.on('exists', () => void onNewMail(account.id))
+    // Back from a dropped connection (sleep, Wi-Fi): pick up what arrived meanwhile.
+    if (reconnected) void onNewMail(account.id)
 
     c.status = { ...c.status, state: 'online', error: null }
     await refreshUnread(account.id)
@@ -209,9 +224,31 @@ async function refreshUnread(id: string): Promise<void> {
 
 // ── New mail ─────────────────────────────────────────────────────────────────
 
+/** How many new mails get their own notification; more than this become one summary. */
+const NOTIFY_EACH_MAX = 4
+
 async function onNewMail(id: string): Promise<void> {
   const c = conns.get(id)
   if (!c?.watcher?.usable) return
+  // Servers often send several EXISTS in a row; parallel passes would notify the same mail twice.
+  if (c.checking) {
+    c.checkAgain = true
+    return
+  }
+  c.checking = true
+  try {
+    await checkNewMail(id, c)
+  } finally {
+    c.checking = false
+  }
+  if (c.checkAgain) {
+    c.checkAgain = false
+    void onNewMail(id)
+  }
+}
+
+async function checkNewMail(id: string, c: Conn): Promise<void> {
+  if (!c.watcher?.usable) return
   const fresh: MailSummary[] = []
   try {
     for await (const msg of c.watcher.fetch(`${c.lastUid + 1}:*`, { uid: true, envelope: true, flags: true, bodyStructure: true, source: { start: 0, maxLength: PREVIEW_BYTES } }, { uid: true })) {
@@ -230,10 +267,23 @@ async function onNewMail(id: string): Promise<void> {
 
   const rules = getValue('mailRules')
   const cats = getValue('mailCategories')
-  for (const m of fresh.filter((x) => !x.seen)) {
+  const wanted = fresh.filter((m) => {
+    if (m.seen) return false
     const mine = categorize(m, rules)
-    const wanted = c.account.notify === 'all' || (c.account.notify === 'categories' && mine.some((cid) => cats.find((k) => k.id === cid)?.notify))
-    if (!wanted) continue
+    return c.account.notify === 'all' || (c.account.notify === 'categories' && mine.some((cid) => cats.find((k) => k.id === cid)?.notify))
+  })
+  // After a long sleep there can be dozens: one summary instead of a wall of notifications.
+  if (wanted.length > NOTIFY_EACH_MAX) {
+    const code = wanted.find((m) => m.code)
+    notify({
+      kind: 'mail',
+      title: `${wanted.length} e-mails novos · ${c.account.name || c.account.email}`,
+      body: code ? `Inclui o código ${code.code} (${code.subject})` : wanted.slice(0, 3).map((m) => m.from.name || m.from.address).join(', '),
+      view: 'mail'
+    })
+    return
+  }
+  for (const m of wanted) {
     notify({
       kind: 'mail',
       title: m.from.name || m.from.address,
@@ -391,14 +441,31 @@ export async function listMessages(id: string, folder: string, page = 0, query =
   return { items, total }
 }
 
-/** Unified view of a category: recent inbox mail from every account matching its rules. */
+const CATEGORY_LIMIT = 60
+
+/**
+ * Unified view of a category across accounts. The rules become one IMAP SEARCH
+ * (OR of from/to/subject terms) so the server finds matches in the whole inbox,
+ * not just the latest page; results are re-checked locally with the same rules.
+ */
 export async function listCategory(categoryId: string): Promise<MailSummary[]> {
-  const rules = getValue('mailRules').filter((r) => r.categoryId === categoryId)
+  const rules = getValue('mailRules').filter((r) => r.categoryId === categoryId && r.contains.trim())
+  if (!rules.length) return []
+  const terms = rules.map((r) => ({ [r.field]: r.contains.trim() }))
   // Accounts in parallel; an offline one just contributes nothing.
   const lists = await Promise.all(
     getValue('mailAccounts').map(async (a) => {
       try {
-        const { items } = await listMessages(a.id, 'INBOX', 0)
+        const w = await worker(a.id)
+        const lock = await w.getMailboxLock('INBOX')
+        const items: MailSummary[] = []
+        try {
+          const found = ((await w.search(terms.length === 1 ? terms[0] : { or: terms }, { uid: true })) || []) as number[]
+          const newest = found.sort((x, y) => y - x).slice(0, CATEGORY_LIMIT)
+          if (newest.length) for await (const msg of w.fetch(newest, LIST_QUERY, { uid: true })) items.push(summarize(a.id, 'INBOX', msg))
+        } finally {
+          lock.release()
+        }
         const matched = items.filter((m) => categorize(m, rules).length)
         schedulePreviews(a.id, 'INBOX', matched.map((m) => m.uid))
         return matched

@@ -1,6 +1,6 @@
 import { globalShortcut, type BrowserWindow } from 'electron'
 import type { AppSettings, RadioCommand, ShortcutAction, ShortcutStatus } from '@shared/types'
-import { radioState } from './popover'
+import { radioState, speechActive } from './popover'
 import * as spotify from './spotify'
 
 type Source = 'radio' | 'spotify'
@@ -22,7 +22,8 @@ const radio = (cmd: RadioCommand): void => {
  * (radio first, it's local), otherwise the one used last.
  */
 async function target(): Promise<{ source: Source; spotifyPlaying: boolean }> {
-  if (radioState().playing) return { source: 'radio', spotifyPlaying: false }
+  // The main window routes radio commands to the news reading while it runs.
+  if (speechActive() || radioState().playing) return { source: 'radio', spotifyPlaying: false }
   const st = await spotify.status().catch(() => null)
   if (st?.connected) {
     const pb = await spotify.playback()
