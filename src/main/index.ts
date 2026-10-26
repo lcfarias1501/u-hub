@@ -11,6 +11,7 @@ import * as mail from './mail'
 import * as social from './social'
 import { resolveConflict, startSync, syncNow, syncStatus } from './sync'
 import { radarSnapshot, refreshRadar, searchSteam, startRadar } from './radar'
+import { discoverFeed, newsSnapshot, readArticle, refreshNews, startNews } from './news'
 import { launch } from './launcher'
 import { applySettings, canOpenAtLogin, quitting, showWindow } from './shellIntegration'
 import * as spotify from './spotify'
@@ -237,6 +238,11 @@ function registerIpc(): void {
   ipcMain.handle('radar:refresh', () => refreshRadar())
   ipcMain.handle('radar:search', (_e, term: string) => searchSteam(String(term)))
 
+  ipcMain.handle('news:get', () => newsSnapshot())
+  ipcMain.handle('news:refresh', () => refreshNews())
+  ipcMain.handle('news:discover', (_e, input: string) => discoverFeed(String(input)))
+  ipcMain.handle('news:article', (_e, url: string) => readArticle(String(url)))
+
   ipcMain.handle('launcher:run', (_e, id: string) => {
     const l = getValue('launchers').find((x) => x.id === id)
     return l ? launch(l) : { ok: false, error: 'Launcher não encontrado' }
@@ -253,6 +259,7 @@ app.whenReady().then(() => {
   initNotifications(() => win)
   startLibrary()
   startRadar(() => win)
+  startNews(() => win)
   initShortcuts(
     () => win,
     () => showWindow(win)

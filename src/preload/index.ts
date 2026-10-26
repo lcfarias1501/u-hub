@@ -6,6 +6,9 @@ import type {
   LibrarySnapshot,
   AppNotification,
   RadarSnapshot,
+  NewsSnapshot,
+  ArticleContent,
+  FeedDiscovery,
   SteamSearchResult,
   DiscordStatus,
   ShortcutStatus,
@@ -219,6 +222,17 @@ const api = {
       const listener = (_: unknown, s: RadarSnapshot): void => cb(s)
       ipcRenderer.on('radar:update', listener)
       return () => ipcRenderer.off('radar:update', listener)
+    }
+  },
+  news: {
+    get: (): Promise<NewsSnapshot> => ipcRenderer.invoke('news:get'),
+    refresh: (): Promise<NewsSnapshot> => ipcRenderer.invoke('news:refresh'),
+    discover: (input: string): Promise<FeedDiscovery> => ipcRenderer.invoke('news:discover', input),
+    article: (url: string): Promise<ArticleContent> => ipcRenderer.invoke('news:article', url),
+    onUpdate: (cb: (s: NewsSnapshot) => void): (() => void) => {
+      const listener = (_: unknown, s: NewsSnapshot): void => cb(s)
+      ipcRenderer.on('news:update', listener)
+      return () => ipcRenderer.off('news:update', listener)
     }
   },
   notifications: {

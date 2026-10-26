@@ -24,7 +24,8 @@ const SYNC_KEYS = [
   'profile',
   'mailCategories',
   'mailRules',
-  'mailTrustedSenders'
+  'mailTrustedSenders',
+  'newsFollow'
 ] as const satisfies readonly StoreKey[]
 type SyncKey = (typeof SYNC_KEYS)[number]
 

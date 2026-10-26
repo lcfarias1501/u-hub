@@ -8,6 +8,7 @@ import {
   ListMusic,
   Loader2,
   MessageSquare,
+  Newspaper,
   Palette,
   PanelTop,
   Power,
@@ -17,11 +18,12 @@ import {
   type LucideIcon
 } from 'lucide-react'
 import { useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react'
-import type { Accent, LibrarySnapshot, ModuleId, Profile, SpotifyStatus, ThemeAccent } from '@shared/types'
+import { NEWS_CATEGORIES, type Accent, type LibrarySnapshot, type ModuleId, type Profile, type SpotifyStatus, type ThemeAccent } from '@shared/types'
 import logo from '@renderer/assets/logo.png'
 import { AccountCard, useSocial } from '@renderer/components/AccountCard'
 import { Switch } from '@renderer/components/Controls'
 import { Modal } from '@renderer/components/Modal'
+import { usePersistentState } from '@renderer/hooks/usePersistentState'
 import { AccentPicker, IconPicker } from '@renderer/components/Pickers'
 import { MODULES } from '@renderer/components/nav'
 import { isMac } from '@renderer/hooks/useHotkeys'
@@ -37,7 +39,8 @@ type StepId = 'welcome' | 'login' | 'profile' | 'modules' | 'look' | 'connection
 const MODULE_PITCH: Record<ModuleId, string> = {
   performance: 'CPU, memória, rede, bateria e temperatura em tempo real.',
   library: 'Seus jogos da Steam, Epic e outros num só lugar, com tempo de jogo.',
-  radar: 'Jogos grátis, promoções, alerta de preço e patch notes dos seus jogos.',
+  radar: 'Jogos grátis da Epic, promoções da Steam e alerta de preço na sua lista de desejos.',
+  news: 'Notícias de jogos, tecnologia, mundo, esportes e mais — e o U-Hub lê elas em voz alta para você.',
   friends: 'Adicione amigos e veja em tempo real o que cada um está jogando.',
   mail: 'Seus e-mails (Gmail, iCloud, outros) organizados por categorias, com códigos de verificação a um clique.',
   vault: 'Senhas, keys e servidores de jogo criptografados no seu computador.',
@@ -67,7 +70,7 @@ export function Onboarding({ onFinish }: { onFinish: (firstModule: ModuleId) => 
   }, [])
 
   const selected = settings.modules.filter((m) => m.visible).map((m) => m.id)
-  const hasConnections = selected.some((m) => m === 'media' || m === 'library' || m === 'radar')
+  const hasConnections = selected.some((m) => m === 'media' || m === 'library' || m === 'radar' || m === 'news')
   const steps = useMemo<StepId[]>(
     () => ['welcome', 'profile', 'modules', 'look', ...(hasConnections ? (['connections'] as const) : []), 'daily', 'done'],
     [hasConnections]
@@ -487,8 +490,44 @@ function ConnectionsStep({ selected }: { selected: ModuleId[] }) {
             </select>
           </Row>
         )}
+        {selected.includes('news') && <NewsTopics />}
       </div>
     </Step>
+  )
+}
+
+function NewsTopics() {
+  const [follow, setFollow] = usePersistentState('newsFollow', ['games', 'tech', 'world', 'sports'])
+  return (
+    <div className="py-3.5">
+      <div className="flex items-center gap-4">
+        <span className="grid size-9 shrink-0 place-items-center rounded-[4px] border border-volt/25 bg-volt/10 text-volt-soft">
+          <Newspaper className="size-4" />
+        </span>
+        <div>
+          <div className="text-[13px] font-medium text-zinc-100">Notícias que você quer</div>
+          <div className="text-[11px] leading-snug text-zinc-500">Escolha os assuntos. Dá para adicionar qualquer site depois, em Notícias.</div>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-1.5 pl-[52px]">
+        {NEWS_CATEGORIES.map((c) => {
+          const Icon = iconFor(c.icon)
+          const on = follow.includes(c.id)
+          return (
+            <button
+              key={c.id}
+              onClick={() => (on ? follow.length > 1 && setFollow(follow.filter((f) => f !== c.id)) : setFollow([...follow, c.id]))}
+              className={`flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11px] transition-colors ${
+                on ? 'border-volt/50 bg-volt/15 text-volt-100' : 'border-white/[0.08] text-zinc-500 hover:text-zinc-200'
+              }`}
+            >
+              <Icon className="size-3" />
+              {c.label}
+            </button>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 

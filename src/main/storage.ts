@@ -3,7 +3,7 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import Store from 'electron-store'
-import { DEFAULT_SETTINGS, normalizeSettings, type AppSettings, type RadarSnapshot, type Launcher, type RadioStation, type StoreKey, type StoreSchema, type VaultEntry } from '@shared/types'
+import { DEFAULT_SETTINGS, normalizeSettings, type AppSettings, type NewsSnapshot, type RadarSnapshot, type Launcher, type RadioStation, type StoreKey, type StoreSchema, type VaultEntry } from '@shared/types'
 
 const DEFAULT_STATIONS: RadioStation[] = [
   { id: 'st-groove', name: 'Groove Salad', genre: 'Ambient / Downtempo', url: 'https://ice1.somafm.com/groovesalad-128-mp3' },
@@ -41,6 +41,7 @@ interface Sealed {
 interface PrivateSchema {
   /** Last radar fetch, so the module opens instantly (and offline). */
   radarCache: Omit<RadarSnapshot, 'refreshing' | 'errors'> | null
+  newsCache: Omit<NewsSnapshot, 'refreshing' | 'errors'> | null
   /** Ids already announced, so each freebie/patch notifies once. */
   radarSeen: { free: string[]; news: string[] }
   onboardingMigrated: boolean
@@ -86,11 +87,7 @@ const store = new Store<StoreSchema & PrivateSchema>({
     hiddenGames: [],
     playtime: {},
     wishlist: [],
-    newsSources: [
-      { id: 'ign-br', name: 'IGN Brasil', url: 'https://br.ign.com/feed.xml', enabled: true },
-      { id: 'adrenaline', name: 'Adrenaline', url: 'https://www.adrenaline.com.br/feed/', enabled: true },
-      { id: 'pcgamer', name: 'PC Gamer', url: 'https://www.pcgamer.com/rss/', enabled: false }
-    ],
+    newsSources: [], // seeded with the built-in sources by news.ts
     notifications: [],
     lastSeenVersion: null,
     profile: null,
@@ -118,7 +115,9 @@ const store = new Store<StoreSchema & PrivateSchema>({
       { id: 'r-verify', categoryId: 'security', field: 'subject', contains: 'verifica' }
     ],
     mailTrustedSenders: [],
+    newsFollow: ['games', 'tech', 'world', 'sports'],
     radarCache: null,
+    newsCache: null,
     radarSeen: { free: [], news: [] },
     onboardingMigrated: false,
     supabaseAuth: null,
@@ -141,7 +140,7 @@ if (!store.get('onboardingMigrated')) {
 }
 
 const PUBLIC_KEYS = new Set<StoreKey>([
-  'sidebarCollapsed', 'lastView', 'perfLayout', 'quests', 'launchers', 'stations', 'playlists', 'volume', 'vaultCategories', 'settings', 'manualGames', 'hiddenGames', 'playtime', 'wishlist', 'newsSources', 'notifications', 'lastSeenVersion', 'profile', 'onboarded', 'mailAccounts', 'mailCategories', 'mailRules', 'mailTrustedSenders'
+  'sidebarCollapsed', 'lastView', 'perfLayout', 'quests', 'launchers', 'stations', 'playlists', 'volume', 'vaultCategories', 'settings', 'manualGames', 'hiddenGames', 'playtime', 'wishlist', 'newsSources', 'notifications', 'lastSeenVersion', 'profile', 'onboarded', 'mailAccounts', 'mailCategories', 'mailRules', 'mailTrustedSenders', 'newsFollow'
 ])
 
 /** Keys included in backups (everything user-authored except secrets and Spotify auth). */

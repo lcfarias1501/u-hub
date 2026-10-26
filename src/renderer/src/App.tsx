@@ -19,6 +19,8 @@ import { MailView, useMailUnread } from './views/mail/MailView'
 import { PerformanceView } from './views/PerformanceView'
 import { QuestView } from './views/QuestView'
 import { RadarView } from './views/RadarView'
+import { NewsView } from './views/NewsView'
+import { NewsPlayer } from './components/NewsPlayer'
 import { SettingsView } from './views/SettingsView'
 import { VaultView } from './views/VaultView'
 
@@ -106,6 +108,7 @@ function Shell() {
           {view === 'performance' && <PerformanceView />}
           {view === 'library' && <LibraryView />}
           {view === 'radar' && <RadarView />}
+          {view === 'news' && <NewsView />}
           {view === 'friends' && <FriendsView />}
           {view === 'mail' && <MailView />}
           {view === 'vault' && <VaultView />}
@@ -118,6 +121,7 @@ function Shell() {
           )}
         </main>
       </div>
+      <NewsPlayer onOpen={() => setView('news')} />
       {news && <WhatsNew entries={news} title="Novidades desde a última versão" onClose={() => setNews(null)} />}
       <SyncConflictDialog />
       <RecoveryDialog />

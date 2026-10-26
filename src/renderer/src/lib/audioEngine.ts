@@ -22,6 +22,8 @@ class AudioEngine {
   analyser: AnalyserNode | null = null
   private state: AudioState = { station: null, playing: false, loading: false, error: null, volume: 0.6 }
   private listeners = new Set<() => void>()
+  /** Lowered while news are being read aloud; never touches the user's volume. */
+  private ducked = false
   /** Station skipping needs the station list, which the radio bridge provides. */
   skip: ((dir: 1 | -1) => void) | null = null
 
@@ -68,7 +70,7 @@ class AudioEngine {
     this.analyser.fftSize = 256
     this.analyser.smoothingTimeConstant = 0.78
     this.gain = this.ctx.createGain()
-    this.gain.gain.value = this.state.volume
+    this.gain.gain.value = this.level()
     src.connect(this.analyser).connect(this.gain).connect(this.ctx.destination)
   }
 
@@ -114,10 +116,21 @@ class AudioEngine {
     else if (this.state.station) void this.play(this.state.station)
   }
 
+  private level(): number {
+    return this.state.volume * (this.ducked ? 0.15 : 1)
+  }
+
   setVolume(v: number): void {
     const volume = Math.min(1, Math.max(0, v))
-    if (this.gain) this.gain.gain.value = volume
     this.patch({ volume })
+    if (this.gain) this.gain.gain.value = this.level()
+  }
+
+  /** Fades the radio under speech (and back), like a car stereo under the GPS. */
+  duck(on: boolean): void {
+    if (this.ducked === on) return
+    this.ducked = on
+    if (this.gain && this.ctx) this.gain.gain.setTargetAtTime(this.level(), this.ctx.currentTime, 0.25)
   }
 }
 

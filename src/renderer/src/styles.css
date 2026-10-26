@@ -189,6 +189,15 @@ input[type='range']:disabled::-webkit-slider-thumb {
 .animate-pulse-dot {
   animation: pulse-dot 1.6s ease-in-out infinite;
 }
+/* "Reading aloud" equalizer next to the news item being spoken. Only runs while speech plays. */
+@keyframes eq {
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
+}
+.eq-bar {
+  transform-origin: bottom;
+  animation: eq 0.9s ease-in-out infinite;
+}
 
 /* Settings → Aparência → "Reduzir animações" toggles this class on <html>. */
 .reduce-motion *,

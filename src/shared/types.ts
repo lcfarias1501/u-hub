@@ -81,7 +81,7 @@ export interface SpotifyPlaylist {
   uri: string
 }
 
-export type ModuleId = 'performance' | 'library' | 'radar' | 'friends' | 'mail' | 'vault' | 'media' | 'quests'
+export type ModuleId = 'performance' | 'library' | 'radar' | 'news' | 'friends' | 'mail' | 'vault' | 'media' | 'quests'
 export type ViewId = ModuleId | 'settings'
 
 /** App-wide accent (the "volt" colour). A subset of Accent that reads well as a primary. */
@@ -108,6 +108,9 @@ export interface AppSettings {
   shortcuts: Record<ShortcutAction, string>
   discord: DiscordSettings
   social: SocialSettings
+  /** Text-to-speech for news: system voice URI (null = best Portuguese voice) and speed. */
+  newsVoice: string | null
+  newsRate: number
 }
 
 export type ShortcutAction = 'toggleWindow' | 'mediaPlayPause' | 'mediaNext' | 'mediaPrev' | 'radioVolumeUp' | 'radioVolumeDown'
@@ -151,6 +154,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     { id: 'performance', visible: true },
     { id: 'library', visible: true },
     { id: 'radar', visible: true },
+    { id: 'news', visible: true },
     { id: 'friends', visible: true },
     { id: 'mail', visible: true },
     { id: 'vault', visible: true },
@@ -182,7 +186,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
     radioVolumeDown: ''
   },
   discord: { enabled: true, clientId: null, showGames: true, showRadio: true, showIdle: false, showButton: true },
-  social: { shareGame: true, shareMusic: true, invisible: false }
+  social: { shareGame: true, shareMusic: true, invisible: false },
+  newsVoice: null,
+  newsRate: 1
 }
 
 /**
@@ -252,6 +258,8 @@ export interface StoreSchema {
   mailRules: MailRule[]
   /** Senders whose remote images load automatically. */
   mailTrustedSenders: string[]
+  /** News categories the user follows. */
+  newsFollow: NewsCategoryId[]
   stations: RadioStation[]
   playlists: SpotifyPlaylist[]
   volume: number
@@ -460,6 +468,55 @@ export interface NewsSource {
   name: string
   url: string
   enabled: boolean
+  category: NewsCategoryId
+  /** Added by the user (can be removed); built-in sources can only be disabled. */
+  custom?: boolean
+}
+
+export type NewsCategoryId = 'games' | 'tech' | 'world' | 'sports' | 'music' | 'movies' | 'science' | 'economy' | 'other'
+
+export const NEWS_CATEGORIES: { id: NewsCategoryId; label: string; icon: string }[] = [
+  { id: 'games', label: 'Jogos', icon: 'gamepad' },
+  { id: 'tech', label: 'Tecnologia', icon: 'cpu' },
+  { id: 'world', label: 'Mundo', icon: 'globe' },
+  { id: 'sports', label: 'Esportes', icon: 'trophy' },
+  { id: 'music', label: 'Música', icon: 'music' },
+  { id: 'movies', label: 'Cinema & Séries', icon: 'tv' },
+  { id: 'science', label: 'Ciência', icon: 'rocket' },
+  { id: 'economy', label: 'Economia', icon: 'coins' },
+  { id: 'other', label: 'Outros', icon: 'star' }
+]
+
+export interface NewsSnapshot {
+  items: NewsItem[]
+  updatedAt: number | null
+  refreshing: boolean
+  errors: string[]
+}
+
+/** A piece of an extracted article. Plain text only: the reader renders it natively, and TTS reads it block by block. */
+export type ArticleBlock = { kind: 'p' | 'h' | 'quote' | 'li'; text: string } | { kind: 'img'; src: string; caption: string | null }
+
+/** Reader-mode extraction of an article page. ok=false → show the feed summary + "open on site". */
+export interface ArticleContent {
+  ok: boolean
+  url: string
+  title: string
+  byline: string | null
+  siteName: string | null
+  blocks: ArticleBlock[]
+  image: string | null
+  /** BCP-47-ish language of the page (from <html lang>), to pick a matching voice. */
+  lang: string | null
+  error?: string
+}
+
+export interface FeedDiscovery {
+  ok: boolean
+  url?: string
+  title?: string
+  sample?: string[]
+  error?: string
 }
 
 export interface NewsItem {
@@ -472,6 +529,7 @@ export interface NewsItem {
   /** Feed name for RSS; game name for Steam news. */
   source: string
   kind: 'rss' | 'steam'
+  category: NewsCategoryId
   appid?: number
   patch: boolean
 }
@@ -479,7 +537,6 @@ export interface NewsItem {
 export interface RadarSnapshot {
   free: FreeGame[]
   deals: Deal[]
-  news: NewsItem[]
   updatedAt: number | null
   refreshing: boolean
   errors: string[]

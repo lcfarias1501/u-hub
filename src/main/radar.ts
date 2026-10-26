@@ -1,15 +1,10 @@
 import { app, type BrowserWindow } from 'electron'
-import type { Deal, FreeGame, NewsItem, NewsSource, RadarSnapshot, SteamSearchResult, WishlistItem } from '@shared/types'
-import { snapshot as librarySnapshot } from './games'
+import type { Deal, FreeGame, RadarSnapshot, SteamSearchResult, WishlistItem } from '@shared/types'
 import { notify } from './notifications'
 import { getPrivate, getSettings, getValue, onSettingsChange, onValueChange, setPrivate, setValue } from './storage'
 
 const REFRESH_MS = 3 * 60 * 60_000
 const FIRST_REFRESH_DELAY_MS = 20_000
-const NEWS_PER_GAME = 5
-const MAX_STEAM_GAMES = 15
-const MAX_NEWS = 150
-const DAY_MS = 86_400_000
 const UA = 'Mozilla/5.0 (U-Hub; +https://github.com/lcfarias1501/u-hub)'
 
 /** Storefront region: the user's choice in Settings, else the OS region (BR → BRL, PT → EUR…). */
@@ -188,109 +183,9 @@ async function refreshWishlist(): Promise<void> {
   setValue('wishlist', next)
 }
 
-// ── News: Steam announcements + RSS ──────────────────────────────────────────
-
-/** Steam news bodies are BBCode/HTML; the list only needs a plain-text teaser. */
-const plain = (s: string): string =>
-  s
-    // Some feeds escape their HTML (&lt;img …&gt;): unescape the brackets first so the tags get stripped too.
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/\[img\][\s\S]*?\[\/img\]/gi, ' ')
-    .replace(/\[\/?[a-z0-9*]+(=[^\]]*)?\]/gi, ' ')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&quot;/g, '"')
-    .replace(/&#0?39;|&apos;/g, "'")
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/\{STEAM_CLAN_IMAGE\}\S*/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-
-interface SteamNews {
-  gid: string
-  title: string
-  url: string
-  date: number
-  contents: string
-  feedname: string
-  tags?: string[]
-}
-
-/** Steam games worth following: the most recently played installed ones, plus the wishlist. */
-function followedSteamGames(): { appid: number; name: string; played: boolean }[] {
-  const lib = librarySnapshot()
-  const owned = lib.games
-    .filter((g) => g.source === 'steam')
-    .map((g) => {
-      const p = lib.playtime[g.id]
-      return { appid: Number(g.id.slice(6)), name: g.name, last: Math.max(p?.lastPlayed ?? 0, g.sourceLastPlayed ?? 0) }
-    })
-    .sort((a, b) => b.last - a.last)
-    .slice(0, MAX_STEAM_GAMES)
-  const recent = Date.now() - 30 * DAY_MS
-  const out = owned.map((g) => ({ appid: g.appid, name: g.name, played: g.last > recent }))
-  for (const w of getValue('wishlist')) if (!out.some((g) => g.appid === w.appid)) out.push({ appid: w.appid, name: w.name, played: false })
-  return out
-}
-
-async function fetchSteamNews(): Promise<{ items: NewsItem[]; played: Set<number> }> {
-  const games = followedSteamGames()
-  const played = new Set(games.filter((g) => g.played).map((g) => g.appid))
-  const results = await Promise.allSettled(
-    games.map(async (g) => {
-      const data = await fetchJson<{ appnews: { newsitems: SteamNews[] } }>(
-        `https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/?appid=${g.appid}&count=${NEWS_PER_GAME}&maxlength=600&format=json`
-      )
-      return data.appnews.newsitems
-        // Only the developer's own announcements; third-party press feeds are often other languages.
-        .filter((n) => n.feedname === 'steam_community_announcements')
-        .map(
-          (n): NewsItem => ({
-            id: `steam:${n.gid}`,
-            title: n.title,
-            url: n.url,
-            date: n.date * 1000,
-            summary: plain(n.contents).slice(0, 280),
-            image: `https://cdn.cloudflare.steamstatic.com/steam/apps/${g.appid}/header.jpg`,
-            source: g.name,
-            kind: 'steam',
-            appid: g.appid,
-            patch: !!n.tags?.includes('patchnotes') || /\b(patch|update|hotfix|atualiza)/i.test(n.title)
-          })
-        )
-    })
-  )
-  return { items: results.flatMap((r) => (r.status === 'fulfilled' ? r.value : [])), played }
-}
-
-const tag = (xml: string, name: string): string | null => {
-  const m = xml.match(new RegExp(`<${name}[^>]*>([\\s\\S]*?)</${name}>`, 'i'))
-  return m ? m[1].replace(/^\s*<!\[CDATA\[([\s\S]*?)\]\]>\s*$/, '$1').trim() : null
-}
-const attr = (xml: string, name: string, a: string): string | null => xml.match(new RegExp(`<${name}[^>]*\\s${a}="([^"]+)"`, 'i'))?.[1] ?? null
-
-/** Tiny RSS 2.0 reader: title, link, date, teaser and the first image it can find. */
-async function fetchRss(src: NewsSource): Promise<NewsItem[]> {
-  const xml = await fetchText(src.url)
-  const items = xml.match(/<item[\s>][\s\S]*?<\/item>/gi) ?? []
-  return items.slice(0, 25).flatMap((it): NewsItem[] => {
-    const title = tag(it, 'title')
-    const link = tag(it, 'link') ?? attr(it, 'link', 'href')
-    if (!title || !link) return []
-    const body = tag(it, 'content:encoded') ?? tag(it, 'description') ?? ''
-    const image =
-      attr(it, 'media:content', 'url') ?? attr(it, 'media:thumbnail', 'url') ?? attr(it, 'enclosure', 'url') ?? body.match(/<img[^>]+src="([^"]+)"/i)?.[1] ?? null
-    const date = Date.parse(tag(it, 'pubDate') ?? tag(it, 'dc:date') ?? '') || Date.now()
-    return [{ id: `rss:${link}`, title: plain(title), url: link, date, summary: plain(tag(it, 'description') ?? body).slice(0, 280), image, source: src.name, kind: 'rss', patch: false }]
-  })
-}
-
 // ── Orchestration ────────────────────────────────────────────────────────────
 
-let state: RadarSnapshot = { free: [], deals: [], news: [], updatedAt: null, refreshing: false, errors: [] }
+let state: RadarSnapshot = { free: [], deals: [], updatedAt: null, refreshing: false, errors: [] }
 let getWin: () => BrowserWindow | null = () => null
 const emit = (): void => getWin()?.webContents.send('radar:update', state)
 
@@ -312,50 +207,35 @@ export async function refreshRadar(): Promise<RadarSnapshot> {
     }
   }
 
-  const sources = getValue('newsSources').filter((s) => s.enabled)
-  const [free, deals, steamNews, rss] = await Promise.all([
+  const [free, deals] = await Promise.all([
     settle('Epic', fetchFreeGames(), state.free),
     settle('Steam ofertas', fetchDeals(), state.deals),
-    settle('Notícias Steam', fetchSteamNews(), { items: [], played: new Set<number>() }),
-    Promise.all(sources.map((s) => settle(s.name, fetchRss(s), [] as NewsItem[]))).then((x) => x.flat()),
     settle('Lista de desejos', refreshWishlist(), undefined)
   ])
 
-  const news = [...steamNews.items, ...rss].sort((a, b) => b.date - a.date).slice(0, MAX_NEWS)
-  announce(free, steamNews.items, steamNews.played)
+  announce(free)
 
-  state = { free, deals, news, updatedAt: Date.now(), refreshing: false, errors }
-  setPrivate('radarCache', { free, deals, news, updatedAt: state.updatedAt })
+  state = { free, deals, updatedAt: Date.now(), refreshing: false, errors }
+  setPrivate('radarCache', { free, deals, updatedAt: state.updatedAt })
   emit()
   return state
 }
 
-/**
- * Notifies new free games and new patch notes for games played in the last 30
- * days. The first run only records what exists, so installing doesn't spam.
- */
-function announce(free: FreeGame[], steamNews: NewsItem[], played: Set<number>): void {
+/** Notifies new free games. The first run only records what exists, so installing doesn't spam. */
+function announce(free: FreeGame[]): void {
   const seen = getPrivate('radarSeen')
-  const firstRun = seen.free.length === 0 && seen.news.length === 0
-  if (!firstRun) {
+  if (seen.free.length > 0) {
     for (const f of free.filter((x) => x.status === 'now' && !seen.free.includes(x.id))) {
       notify({ kind: 'free', title: `Grátis na Epic: ${f.title}`, body: `Resgate até ${new Date(f.endsAt).toLocaleDateString('pt-BR')}`, url: f.url, image: f.image, view: 'radar' })
     }
-    const weekAgo = Date.now() - 7 * DAY_MS
-    for (const n of steamNews.filter((x) => x.patch && x.appid && played.has(x.appid) && x.date > weekAgo && !seen.news.includes(x.id))) {
-      notify({ kind: 'patch', title: `Atualização: ${n.source}`, body: n.title, url: n.url, image: n.image, view: 'radar' })
-    }
   }
-  setPrivate('radarSeen', {
-    free: [...new Set([...seen.free, ...free.map((f) => f.id)])].slice(-200),
-    news: [...new Set([...seen.news, ...steamNews.map((n) => n.id)])].slice(-1000)
-  })
+  setPrivate('radarSeen', { ...getPrivate('radarSeen'), free: [...new Set([...seen.free, ...free.map((f) => f.id)])].slice(-200) })
 }
 
 export function startRadar(win: () => BrowserWindow | null): void {
   getWin = win
   const cache = getPrivate('radarCache')
-  if (cache) state = { ...cache, refreshing: false, errors: [] }
+  if (cache) state = { free: cache.free, deals: cache.deals, updatedAt: cache.updatedAt, refreshing: false, errors: [] }
   setTimeout(() => void refreshRadar(), FIRST_REFRESH_DELAY_MS)
   setInterval(() => void refreshRadar(), REFRESH_MS)
   // Adding a game to the wishlist should show its price right away.

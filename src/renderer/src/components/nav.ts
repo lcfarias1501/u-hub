@@ -1,4 +1,4 @@
-import { Activity, KeyRound, LibraryBig, Mail, Music2, Newspaper, ScrollText, Settings, Users, type LucideIcon } from 'lucide-react'
+import { Activity, BadgePercent, KeyRound, LibraryBig, Mail, Music2, Newspaper, ScrollText, Settings, Users, type LucideIcon } from 'lucide-react'
 import type { ModuleId, ViewId } from '@shared/types'
 
 export interface NavItem {
@@ -13,7 +13,8 @@ export interface NavItem {
 export const MODULES: Record<ModuleId, NavItem> = {
   performance: { id: 'performance', label: 'Performance', code: 'SYS', icon: Activity },
   library: { id: 'library', label: 'Biblioteca', code: 'LIB', icon: LibraryBig },
-  radar: { id: 'radar', label: 'Ofertas & Notícias', code: 'RDR', icon: Newspaper },
+  radar: { id: 'radar', label: 'Ofertas', code: 'DLS', icon: BadgePercent },
+  news: { id: 'news', label: 'Notícias', code: 'NWS', icon: Newspaper },
   friends: { id: 'friends', label: 'Amigos', code: 'SQD', icon: Users },
   mail: { id: 'mail', label: 'E-mail', code: 'MAL', icon: Mail },
   vault: { id: 'vault', label: 'Vault & Keys', code: 'VLT', icon: KeyRound },

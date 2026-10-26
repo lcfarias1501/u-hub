@@ -248,7 +248,7 @@ function GeneralSection({ info }: { info: AppInfo | null }) {
       >
         <Switch checked={settings.closeToTray} onChange={(closeToTray) => update({ closeToTray })} label="Fechar para a bandeja" />
       </SettingRow>
-      <SettingRow title="Região das lojas" description="Define a moeda e os preços em Ofertas & Notícias (Steam e Epic).">
+      <SettingRow title="Região das lojas" description="Define a moeda e os preços em Ofertas (Steam e Epic).">
         <select className="field h-8 w-48 cursor-pointer" value={settings.storeCountry} onChange={(e) => update({ storeCountry: e.target.value })}>
           <option value="auto">Automático{info ? ` (${REGIONS[info.localeCountry] ?? info.localeCountry})` : ''}</option>
           {Object.entries(REGIONS).map(([code, label]) => (

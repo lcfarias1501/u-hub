@@ -1,34 +1,15 @@
-import {
-  AlertTriangle,
-  Bell,
-  ExternalLink,
-  Gift,
-  Heart,
-  Loader2,
-  Newspaper,
-  Plus,
-  RefreshCw,
-  Rss,
-  Search,
-  Tag,
-  Trash2,
-  TrendingDown,
-  Wrench,
-  X
-} from 'lucide-react'
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { Deal, FreeGame, NewsItem, NewsSource, RadarSnapshot, SteamSearchResult, WishlistItem } from '@shared/types'
-import { Field, Modal } from '@renderer/components/Modal'
+import { AlertTriangle, Bell, ExternalLink, Gift, Heart, Loader2, Plus, RefreshCw, Search, Tag, Trash2, TrendingDown } from 'lucide-react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import type { Deal, FreeGame, RadarSnapshot, SteamSearchResult, WishlistItem } from '@shared/types'
 import { usePersistentState } from '@renderer/hooks/usePersistentState'
-import { uid } from '@renderer/lib/format'
 import { PageHeader } from './PageHeader'
 
-type Tab = 'deals' | 'wishlist' | 'news'
+type Tab = 'deals' | 'wishlist'
 
 export const money = (cents: number | null, currency: string | null): string =>
   cents == null || !currency ? '—' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency }).format(cents / 100)
 
-function ago(t: number): string {
+export function ago(t: number): string {
   const m = Math.round((Date.now() - t) / 60_000)
   if (m < 1) return 'agora'
   if (m < 60) return `há ${m} min`
@@ -75,7 +56,7 @@ export function RadarView() {
 
   return (
     <div className="animate-rise p-6">
-      <PageHeader index="06" title="Ofertas & Notícias" subtitle="Grátis · promoções · patches">
+      <PageHeader index="06" title="Ofertas" subtitle="Grátis · promoções · lista de desejos">
         <span className="font-mono text-[10px] text-zinc-600">{radar.updatedAt ? `ATUALIZADO ${ago(radar.updatedAt).toUpperCase()}` : 'NUNCA ATUALIZADO'}</span>
         <button className="btn" disabled={radar.refreshing} onClick={() => void window.uhub.radar.refresh()}>
           {radar.refreshing ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />} Atualizar
@@ -85,7 +66,6 @@ export function RadarView() {
       <div className="mb-5 flex items-center gap-1 border-b border-white/[0.06]">
         <TabButton active={tab === 'deals'} onClick={() => setTab('deals')} icon={<Tag />} label="Ofertas" badge={radar.free.filter((f) => f.status === 'now').length || undefined} />
         <TabButton active={tab === 'wishlist'} onClick={() => setTab('wishlist')} icon={<Heart />} label="Lista de desejos" badge={onSale || undefined} />
-        <TabButton active={tab === 'news'} onClick={() => setTab('news')} icon={<Newspaper />} label="Notícias" />
       </div>
 
       {radar.errors.length > 0 && (
@@ -97,7 +77,6 @@ export function RadarView() {
 
       {tab === 'deals' && <DealsTab radar={radar} watched={watched} onWatch={watch} onUnwatch={unwatch} />}
       {tab === 'wishlist' && <WishlistTab items={wishlist} setItems={setWishlist} onWatch={watch} onUnwatch={unwatch} />}
-      {tab === 'news' && <NewsTab news={radar.news} refreshing={radar.refreshing} />}
     </div>
   )
 }
@@ -383,161 +362,13 @@ function WishRow({ item, onRemove, onTarget }: { item: WishlistItem; onRemove: (
   )
 }
 
-// ── News ─────────────────────────────────────────────────────────────────────
-
-type NewsFilter = 'all' | 'patch' | 'steam' | 'rss'
-
-function NewsTab({ news, refreshing }: { news: NewsItem[]; refreshing: boolean }) {
-  const [filter, setFilter] = useState<NewsFilter>('all')
-  const [sources, setSources] = useState(false)
-  const shown = useMemo(
-    () => news.filter((n) => filter === 'all' || (filter === 'patch' ? n.patch : n.kind === filter)),
-    [news, filter]
-  )
-  const filters: { id: NewsFilter; label: string; icon: ReactNode }[] = [
-    { id: 'all', label: 'Tudo', icon: <Newspaper /> },
-    { id: 'patch', label: 'Patches', icon: <Wrench /> },
-    { id: 'steam', label: 'Meus jogos', icon: <Heart /> },
-    { id: 'rss', label: 'Sites', icon: <Rss /> }
-  ]
-
-  return (
-    <div>
-      <div className="mb-4 flex items-center gap-1">
-        {filters.map((f) => (
-          <button
-            key={f.id}
-            onClick={() => setFilter(f.id)}
-            className={`flex h-8 items-center gap-1.5 rounded-[3px] border px-2.5 text-[12px] transition-colors [&>svg]:size-3.5 ${
-              filter === f.id ? 'border-volt/50 bg-volt/15 text-volt-100' : 'border-transparent text-zinc-500 hover:border-white/10 hover:text-zinc-200'
-            }`}
-          >
-            {f.icon}
-            {f.label}
-          </button>
-        ))}
-        <button className="btn ml-auto" onClick={() => setSources(true)}>
-          <Rss className="size-3.5" /> Fontes
-        </button>
-      </div>
-
-      {shown.length === 0 ? (
-        refreshing ? (
-          <Loading label="Buscando notícias…" />
-        ) : (
-          <Empty
-            text={
-              filter === 'steam' || filter === 'patch'
-                ? 'Sem notícias dos seus jogos. Elas vêm dos jogos da Steam na sua Biblioteca e da sua lista de desejos.'
-                : 'Nenhuma notícia. Confira as fontes ou atualize.'
-            }
-          />
-        )
-      ) : (
-        <div className="space-y-2">
-          {shown.map((n) => (
-            <NewsRow key={n.id} item={n} />
-          ))}
-        </div>
-      )}
-
-      {sources && <SourcesModal onClose={() => setSources(false)} />}
-    </div>
-  )
-}
-
-function NewsRow({ item }: { item: NewsItem }) {
-  const [imgOk, setImgOk] = useState(true)
-  return (
-    <a href={item.url} target="_blank" rel="noreferrer" className="group panel panel-hover flex gap-4 p-2.5">
-      <div className="h-[84px] w-[150px] shrink-0 overflow-hidden rounded-[2px] bg-white/[0.04]">
-        {item.image && imgOk ? (
-          <img src={item.image} alt="" loading="lazy" onError={() => setImgOk(false)} className="size-full object-cover transition-transform duration-500 group-hover:scale-105" />
-        ) : (
-          <div className="grid size-full place-items-center text-zinc-700">
-            <Newspaper className="size-6" />
-          </div>
-        )}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 font-mono text-[10px] text-zinc-500">
-          {item.patch && <span className="flex items-center gap-1 rounded-[2px] bg-volt/20 px-1 text-volt-100"><Wrench className="size-2.5" /> PATCH</span>}
-          <span className="truncate text-zinc-400">{item.source}</span>
-          <span>·</span>
-          <span>{ago(item.date)}</span>
-        </div>
-        <div className="mt-0.5 line-clamp-1 text-[14px] font-medium text-zinc-100 group-hover:text-white">{item.title}</div>
-        <p className="mt-0.5 line-clamp-2 text-[12px] leading-relaxed text-zinc-500">{item.summary}</p>
-      </div>
-      <ExternalLink className="mt-1 size-3.5 shrink-0 text-zinc-700 transition-colors group-hover:text-zinc-300" />
-    </a>
-  )
-}
-
-const DEFAULT_SOURCE_IDS = new Set(['ign-br', 'adrenaline', 'pcgamer'])
-
-function SourcesModal({ onClose }: { onClose: () => void }) {
-  const [sources, setSources] = usePersistentState('newsSources', [])
-  const [name, setName] = useState('')
-  const [url, setUrl] = useState('')
-  const valid = name.trim() && /^https?:\/\/\S+$/.test(url.trim())
-
-  return (
-    <Modal title="Fontes de notícias" onClose={onClose}>
-      <p className="mb-3 text-[12px] text-zinc-500">Feeds RSS de sites de games. As notícias dos seus jogos da Steam entram automaticamente.</p>
-      <ul className="mb-4 space-y-1">
-        {sources.map((s: NewsSource) => (
-          <li key={s.id} className="flex items-center gap-3 rounded-[3px] border border-white/[0.05] bg-black/20 px-3 py-2">
-            <input
-              type="checkbox"
-              checked={s.enabled}
-              onChange={() => setSources(sources.map((x) => (x.id === s.id ? { ...x, enabled: !x.enabled } : x)))}
-              className="size-4 accent-[var(--color-volt)]"
-            />
-            <div className="min-w-0 flex-1">
-              <div className="text-[13px] text-zinc-200">{s.name}</div>
-              <div className="truncate font-mono text-[10px] text-zinc-600">{s.url}</div>
-            </div>
-            {!DEFAULT_SOURCE_IDS.has(s.id) && (
-              <button className="icon-btn hover:!text-rose-300" onClick={() => setSources(sources.filter((x) => x.id !== s.id))} aria-label="Remover fonte">
-                <X className="size-3.5" />
-              </button>
-            )}
-          </li>
-        ))}
-      </ul>
-      <form
-        className="grid grid-cols-[1fr_2fr_auto] items-end gap-2"
-        onSubmit={(e) => {
-          e.preventDefault()
-          if (!valid) return
-          setSources([...sources, { id: uid(), name: name.trim(), url: url.trim(), enabled: true }])
-          setName('')
-          setUrl('')
-        }}
-      >
-        <Field label="Nome">
-          <input className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder="Meu site" />
-        </Field>
-        <Field label="URL do feed RSS">
-          <input className="field" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://site.com/feed" />
-        </Field>
-        <button className="btn btn-volt h-9" disabled={!valid}>
-          <Plus className="size-3.5" /> Adicionar
-        </button>
-      </form>
-      <p className="mt-3 font-mono text-[10px] text-zinc-600">As mudanças valem na próxima atualização.</p>
-    </Modal>
-  )
-}
-
 // ── Shared bits ──────────────────────────────────────────────────────────────
 
-function Empty({ text }: { text: string }) {
+export function Empty({ text }: { text: string }) {
   return <div className="panel px-6 py-10 text-center text-[12px] text-zinc-500">{text}</div>
 }
 
-function Loading({ label }: { label: string }) {
+export function Loading({ label }: { label: string }) {
   return (
     <div className="panel flex items-center justify-center gap-2 px-6 py-10 text-[12px] text-zinc-500">
       <Loader2 className="size-4 animate-spin" /> {label}
