@@ -9,6 +9,8 @@ com os grupos **Adicionado**, **Melhorado** e **Corrigido**.
 
 ## [Não lançado]
 
+## [0.8.0] - 2026-10-27
+
 ### Adicionado
 - **E-mail**: novo módulo para ler e enviar e-mails pelo U-Hub, com sua própria conta (Gmail, iCloud, Yahoo, Zoho ou qualquer IMAP/SMTP). A senha fica criptografada no computador e nunca vai para a nuvem.
   - Várias contas, com pastas (Entrada, Enviados, Arquivo, Lixeira…), busca e contador de não lidos na barra lateral.
