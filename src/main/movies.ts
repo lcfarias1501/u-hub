@@ -343,7 +343,7 @@ async function checkWatchlist(): Promise<void> {
     notify({
       kind: 'watch',
       title: `${w.title} chegou ${arrived.length === 1 ? `na ${arrived[0].name}` : 'no streaming'}`,
-      body: `Disponível em ${arrived.map((p) => p.name).join(', ')} · está na sua lista "Quero ver"`,
+      body: `Disponível em ${arrived.slice(0, 3).map((p) => p.name).join(', ')}${arrived.length > 3 ? ` e mais ${arrived.length - 3}` : ''} · está na sua lista "Quero ver"`,
       image: w.poster,
       view: 'movies'
     })
