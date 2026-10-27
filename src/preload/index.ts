@@ -7,6 +7,15 @@ import type {
   AppNotification,
   RadarSnapshot,
   NewsSnapshot,
+  DiscoverQuery,
+  Episode,
+  Genre,
+  MediaType,
+  MoviesHome,
+  MoviesStatus,
+  TitleDetails,
+  TitlePage,
+  WatchProvider,
   ArticleContent,
   FeedDiscovery,
   SteamSearchResult,
@@ -228,6 +237,16 @@ const api = {
       ipcRenderer.on('radar:update', listener)
       return () => ipcRenderer.off('radar:update', listener)
     }
+  },
+  movies: {
+    status: (): Promise<MoviesStatus> => ipcRenderer.invoke('movies:status'),
+    home: (): Promise<MoviesHome> => ipcRenderer.invoke('movies:home'),
+    genres: (type: MediaType): Promise<Genre[]> => ipcRenderer.invoke('movies:genres', type),
+    providers: (): Promise<WatchProvider[]> => ipcRenderer.invoke('movies:providers'),
+    discover: (q: DiscoverQuery): Promise<TitlePage> => ipcRenderer.invoke('movies:discover', q),
+    search: (query: string, page = 1): Promise<TitlePage> => ipcRenderer.invoke('movies:search', query, page),
+    details: (type: MediaType, id: number): Promise<TitleDetails> => ipcRenderer.invoke('movies:details', type, id),
+    season: (id: number, n: number): Promise<Episode[]> => ipcRenderer.invoke('movies:season', id, n)
   },
   news: {
     get: (): Promise<NewsSnapshot> => ipcRenderer.invoke('news:get'),

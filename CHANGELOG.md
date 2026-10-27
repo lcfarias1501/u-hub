@@ -25,6 +25,16 @@ com os grupos **Adicionado**, **Melhorado** e **Corrigido**.
   - **Adicionar fonte é só colar o endereço do site**: o U-Hub encontra o feed sozinho, mostra as últimas manchetes e você escolhe a categoria. Feeds Atom agora também funcionam.
   - Notícias e patch notes dos seus jogos da Steam continuam em Jogos, com os filtros Patches e Meus jogos.
 - **Apresentação**: escolha dos assuntos de notícias na etapa de conexões.
+- **Filmes & Séries**: novo módulo para descobrir o que assistir, com dados do TMDB.
+  - Início com destaque da semana e prateleiras: em alta, nos seus streamings, nos cinemas, séries em alta e os mais bem avaliados.
+  - **Explorar** com filtros: filmes ou séries, gêneros, duração (ou duração do episódio), onde assistir, época e nota mínima; ordene por populares, mais bem avaliados ou mais recentes.
+  - Ficha completa: sinopse, classificação indicativa, duração, elenco, direção, temporadas e episódios, vídeos e recomendações.
+  - **Trailer dentro do app** (YouTube), com a rádio abaixando enquanto toca.
+  - **Onde assistir** na sua região (streaming, grátis, alugar e comprar, dados da JustWatch), com destaque para os serviços que você assina ("Meus streamings").
+  - **Minha lista**: "Quero ver" e "Já vi" com sua nota; sincroniza com a conta U-Hub.
+  - **Chegou no streaming**: notificação quando algo da sua lista "Quero ver" fica disponível nos seus streamings.
+  - **Me surpreenda**: sorteia um título bem avaliado com os filtros escolhidos.
+  - Busca por filmes e séries.
 
 ### Melhorado
 - **Apresentação**: a escolha de módulos foi redesenhada em três grupos (Jogos, Seu dia, PC & mídia), com "marcar todos" por grupo, e cabe na tela sem rolar.

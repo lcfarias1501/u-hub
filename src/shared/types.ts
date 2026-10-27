@@ -81,7 +81,7 @@ export interface SpotifyPlaylist {
   uri: string
 }
 
-export type ModuleId = 'performance' | 'library' | 'radar' | 'news' | 'friends' | 'mail' | 'vault' | 'media' | 'quests'
+export type ModuleId = 'performance' | 'library' | 'radar' | 'news' | 'movies' | 'friends' | 'mail' | 'vault' | 'media' | 'quests'
 export type ViewId = ModuleId | 'settings'
 
 /** App-wide accent (the "volt" colour). A subset of Accent that reads well as a primary. */
@@ -155,6 +155,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     { id: 'library', visible: true },
     { id: 'radar', visible: true },
     { id: 'news', visible: true },
+    { id: 'movies', visible: true },
     { id: 'friends', visible: true },
     { id: 'mail', visible: true },
     { id: 'vault', visible: true },
@@ -171,7 +172,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   sidebarMode: 'remember',
   zoom: 1,
   notifications: {
-    system: { free: true, price: true, patch: true, game: false, social: true, mail: true, system: true },
+    system: { free: true, price: true, patch: true, game: false, social: true, mail: true, watch: true, system: true },
     quietWhilePlaying: true,
     sound: true,
     badge: true
@@ -260,6 +261,10 @@ export interface StoreSchema {
   mailTrustedSenders: string[]
   /** News categories the user follows. */
   newsFollow: NewsCategoryId[]
+  /** Filmes & Séries: "quero ver" / "já vi". */
+  watchlist: WatchItem[]
+  /** Streaming services the user subscribes to (TMDB provider ids). */
+  myProviders: number[]
   stations: RadioStation[]
   playlists: SpotifyPlaylist[]
   volume: number
@@ -544,7 +549,7 @@ export interface RadarSnapshot {
 
 // ── Notifications ────────────────────────────────────────────────────────────
 
-export type NotificationKind = 'free' | 'price' | 'patch' | 'game' | 'social' | 'mail' | 'system'
+export type NotificationKind = 'free' | 'price' | 'patch' | 'game' | 'social' | 'mail' | 'watch' | 'system'
 
 export interface AppNotification {
   id: string
@@ -828,4 +833,137 @@ export function categorize(m: Pick<MailSummary, 'from' | 'to' | 'subject'>, rule
     if (hay.toLowerCase().includes(needle)) hit.add(r.categoryId)
   }
   return [...hit]
+}
+
+// ── Filmes & Séries (TMDB) ───────────────────────────────────────────────────
+
+export type MediaType = 'movie' | 'tv'
+
+export interface TitleSummary {
+  id: number
+  type: MediaType
+  title: string
+  originalTitle: string
+  year: number | null
+  /** Full image URLs (TMDB CDN), already sized for their use. */
+  poster: string | null
+  backdrop: string | null
+  /** 0–10, TMDB users' average. */
+  rating: number
+  votes: number
+  overview: string
+  genreIds: number[]
+}
+
+export interface Genre {
+  id: number
+  name: string
+}
+
+export interface WatchProvider {
+  id: number
+  name: string
+  logo: string | null
+}
+
+export interface TitleVideo {
+  key: string
+  name: string
+  type: string
+  lang: string | null
+}
+
+export interface CastMember {
+  id: number
+  name: string
+  role: string
+  photo: string | null
+}
+
+export interface SeasonSummary {
+  number: number
+  name: string
+  episodes: number
+  year: number | null
+  poster: string | null
+}
+
+export interface Episode {
+  number: number
+  name: string
+  overview: string
+  runtime: number | null
+  airDate: string | null
+  still: string | null
+  rating: number
+}
+
+export interface TitleDetails extends TitleSummary {
+  tagline: string | null
+  genres: Genre[]
+  /** Minutes: the movie, or a typical episode. */
+  runtime: number | null
+  releaseDate: string | null
+  status: string | null
+  /** Age rating in the user's region ("14", "16", "M/12"…). */
+  certification: string | null
+  /** Directors (movies) or creators (series). */
+  makers: string[]
+  cast: CastMember[]
+  trailer: TitleVideo | null
+  videos: TitleVideo[]
+  /** Where to watch in the user's region (data by JustWatch). */
+  providers: { link: string | null; flatrate: WatchProvider[]; free: WatchProvider[]; rent: WatchProvider[]; buy: WatchProvider[] }
+  recommendations: TitleSummary[]
+  seasons: SeasonSummary[]
+  imdbId: string | null
+}
+
+export interface DiscoverQuery {
+  type: MediaType
+  genres: number[]
+  /** Minutes; for series it filters by episode length. */
+  runtimeMin: number | null
+  runtimeMax: number | null
+  providers: number[]
+  yearFrom: number | null
+  yearTo: number | null
+  minRating: number | null
+  sort: 'popular' | 'rating' | 'recent'
+  page: number
+}
+
+export interface TitlePage {
+  items: TitleSummary[]
+  page: number
+  totalPages: number
+  totalResults: number
+}
+
+export interface MoviesHome {
+  trending: TitleSummary[]
+  nowPlaying: TitleSummary[]
+  streaming: TitleSummary[]
+  series: TitleSummary[]
+  topRated: TitleSummary[]
+}
+
+export interface MoviesStatus {
+  configured: boolean
+  region: string
+}
+
+export interface WatchItem {
+  /** `${type}:${id}` */
+  key: string
+  type: MediaType
+  id: number
+  title: string
+  poster: string | null
+  year: number | null
+  addedAt: number
+  status: 'want' | 'watched'
+  watchedAt: number | null
+  /** The user's own rating, 1–5. */
+  myRating: number | null
 }

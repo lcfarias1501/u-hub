@@ -10,6 +10,7 @@ const MODULE_LABELS: Record<ModuleId, string> = {
   library: 'Biblioteca',
   radar: 'Ofertas',
   news: 'Notícias',
+  movies: 'Filmes & Séries',
   friends: 'Amigos',
   mail: 'E-mail',
   vault: 'Vault & Keys',

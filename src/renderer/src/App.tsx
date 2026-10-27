@@ -20,6 +20,7 @@ import { PerformanceView } from './views/PerformanceView'
 import { QuestView } from './views/QuestView'
 import { RadarView } from './views/RadarView'
 import { NewsView } from './views/NewsView'
+import { MoviesView } from './views/movies/MoviesView'
 import { NewsPlayer } from './components/NewsPlayer'
 import { SettingsView } from './views/SettingsView'
 import { VaultView } from './views/VaultView'
@@ -111,6 +112,7 @@ function Shell() {
           {view === 'library' && <LibraryView />}
           {view === 'radar' && <RadarView />}
           {view === 'news' && <NewsView />}
+          {view === 'movies' && <MoviesView />}
           {view === 'friends' && <FriendsView />}
           {view === 'mail' && <MailView />}
           {view === 'vault' && <VaultView />}

@@ -18,6 +18,10 @@ interface ImportMetaEnv {
 }
 
 interface ImportMetaEnv {
+  readonly MAIN_VITE_TMDB_TOKEN?: string
+}
+
+interface ImportMetaEnv {
   readonly MAIN_VITE_SUPABASE_URL?: string
   readonly MAIN_VITE_SUPABASE_ANON_KEY?: string
 }

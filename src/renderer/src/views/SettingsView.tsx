@@ -338,6 +338,7 @@ const KINDS: { kind: NotificationKind; title: string; description: string }[] = 
   { kind: 'patch', title: 'Patches', description: 'Notas de atualização dos jogos da Steam que você jogou nos últimos 30 dias.' },
   { kind: 'mail', title: 'E-mail', description: 'E-mails novos (por conta: todos, só das categorias que notificam, ou nenhum).' },
   { kind: 'social', title: 'Amigos', description: 'Pedidos de amizade, novas amizades e quando um amigo começa a jogar.' },
+  { kind: 'watch', title: 'Chegou no streaming', description: 'Quando um filme ou série da sua lista "Quero ver" fica disponível para assistir (nos seus streamings, se você escolheu quais tem).' },
   { kind: 'game', title: 'Resumo de sessão', description: 'Quanto tempo você jogou, quando fecha um jogo (sessões de 10 min ou mais).' }
 ]
 

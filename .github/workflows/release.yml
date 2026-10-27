@@ -66,6 +66,8 @@ jobs:
           # Supabase project for profiles/friends (public URL + anon key; access is enforced by RLS).
           MAIN_VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           MAIN_VITE_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+          # TMDB read-only API token for Filmes & Séries (same place).
+          MAIN_VITE_TMDB_TOKEN: ${{ vars.TMDB_TOKEN }}
           # No paid certificates: skip keychain lookup; mac uses ad-hoc signing from electron-builder.yml.
           CSC_IDENTITY_AUTO_DISCOVERY: false
 

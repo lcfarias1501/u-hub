@@ -41,6 +41,7 @@ const MODULE_PITCH: Record<ModuleId, string> = {
   library: 'Seus jogos da Steam, Epic e outros num só lugar, com tempo de jogo.',
   radar: 'Jogos grátis da Epic, promoções da Steam e alerta de preço.',
   news: 'Jogos, tecnologia, mundo, esportes e mais, lidas em voz alta para você.',
+  movies: 'O que assistir: trailers, onde passa nos seus streamings e sua lista.',
   friends: 'Adicione amigos e veja em tempo real o que cada um está jogando.',
   mail: 'Gmail, iCloud e outros, com categorias e códigos de verificação a um clique.',
   vault: 'Senhas, keys e servidores de jogo criptografados no seu computador.',
@@ -331,8 +332,8 @@ function ProfileStep({ profile, setProfile }: { profile: Profile; setProfile: Di
 /** Modules grouped by what they're for, so nine cards read as three choices. */
 const MODULE_GROUPS: { title: string; hint: string; ids: ModuleId[] }[] = [
   { title: 'Jogos', hint: 'biblioteca, ofertas e amigos', ids: ['library', 'radar', 'friends'] },
-  { title: 'Seu dia', hint: 'notícias, e-mail e tarefas', ids: ['news', 'mail', 'quests'] },
-  { title: 'PC & mídia', hint: 'sistema, música e senhas', ids: ['performance', 'media', 'vault'] }
+  { title: 'Mídia', hint: 'notícias, filmes e música', ids: ['news', 'movies', 'media'] },
+  { title: 'Dia a dia & PC', hint: 'e-mail, tarefas, sistema e senhas', ids: ['mail', 'quests', 'performance', 'vault'] }
 ]
 
 function ModulesStep() {

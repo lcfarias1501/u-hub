@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { BrowserWindow, app, clipboard, dialog, globalShortcut, ipcMain, session, shell } from 'electron'
-import type { AppInfo, MailAccount, MailDraft, SpotifyCommand, StoreSchema, VaultEntry, ViewId } from '@shared/types'
+import type { AppInfo, DiscoverQuery, MailAccount, MailDraft, MediaType, SpotifyCommand, StoreSchema, VaultEntry, ViewId } from '@shared/types'
 import { exportBackup, inspectBackup, restoreBackup } from './backup'
 import { discordStatus, startDiscord, stopDiscord } from './discord'
 import { applyShortcuts, initShortcuts, pauseShortcuts, shortcutStatus } from './shortcuts'
@@ -13,6 +13,7 @@ import { resolveConflict, startSync, syncNow, syncStatus } from './sync'
 import { radarSnapshot, refreshRadar, searchSteam, startRadar } from './radar'
 import { discoverFeed, newsSnapshot, readArticle, refreshNews, startNews } from './news'
 import { launch } from './launcher'
+import * as movies from './movies'
 import { applySettings, canOpenAtLogin, quitting, showWindow } from './shellIntegration'
 import * as spotify from './spotify'
 import { getSettings, getValue, isPublicKey, onAnyValueChange, onSettingsChange, quarantineVault, readVault, resetStore, setValue, vaultError, vaultProtection, writeVault } from './storage'
@@ -111,8 +112,17 @@ function openMain(view?: ViewId): void {
   if (view) win.webContents.send('nav:go', view)
 }
 
+/** YouTube player hosts (trailers in Filmes & Séries). */
+const YOUTUBE_EMBED = /^https:\/\/(www\.)?youtube(-nocookie)?\.com\/embed\//
+
 function configureMediaRequests(): void {
   session.defaultSession.webRequest.onBeforeSendHeaders((details, cb) => {
+    // The packaged app runs from file://, which sends no Referer; YouTube's embedded player
+    // refuses to play without one ("error 153"). Identify the app with its project page.
+    if (details.resourceType === 'subFrame' && YOUTUBE_EMBED.test(details.url)) {
+      const has = Object.keys(details.requestHeaders).some((k) => k.toLowerCase() === 'referer')
+      return cb({ requestHeaders: has ? details.requestHeaders : { ...details.requestHeaders, Referer: 'https://github.com/lcfarias1501/u-hub' } })
+    }
     if (details.resourceType !== 'media') return cb({})
     const headers = { ...details.requestHeaders }
     for (const k of Object.keys(headers)) if (k.toLowerCase() === 'referer') delete headers[k]
@@ -271,6 +281,16 @@ function registerIpc(): void {
     )
   )
 
+  const mediaType = (t: unknown): MediaType => (t === 'tv' ? 'tv' : 'movie')
+  ipcMain.handle('movies:status', () => movies.moviesStatus())
+  ipcMain.handle('movies:home', () => movies.home())
+  ipcMain.handle('movies:genres', (_e, type: MediaType) => movies.genres(mediaType(type)))
+  ipcMain.handle('movies:providers', () => movies.providers())
+  ipcMain.handle('movies:discover', (_e, q: DiscoverQuery) => movies.discover({ ...q, type: mediaType(q.type), page: Math.max(1, Number(q.page) || 1) }))
+  ipcMain.handle('movies:search', (_e, query: string, page: number) => movies.search(String(query ?? ''), Math.max(1, Number(page) || 1)))
+  ipcMain.handle('movies:details', (_e, type: MediaType, id: number) => movies.details(mediaType(type), Number(id)))
+  ipcMain.handle('movies:season', (_e, id: number, n: number) => movies.season(Number(id), Number(n)))
+
   ipcMain.handle('launcher:run', (_e, id: string) => {
     const l = getValue('launchers').find((x) => x.id === id)
     return l ? launch(l) : { ok: false, error: 'Launcher não encontrado' }
@@ -288,6 +308,7 @@ app.whenReady().then(() => {
   startLibrary()
   startRadar(() => win)
   startNews(() => win)
+  movies.startMovies()
   initShortcuts(
     () => win,
     () => showWindow(win)

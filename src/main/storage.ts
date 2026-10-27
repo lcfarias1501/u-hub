@@ -49,6 +49,8 @@ interface PrivateSchema {
   supabaseAuth: Sealed | null
   /** Mail passwords by account id, sealed like the vault. */
   mailSecrets: Sealed | null
+  /** "Chegou no streaming": provider ids last seen per `${region}:${type}:${id}`. */
+  watchProvidersSeen: Record<string, number[]>
   /** Per synced key: when it last changed on this device (ms). */
   syncMeta: Record<string, number>
   /** Account this device last finished a first sync with. */
@@ -116,6 +118,9 @@ const store = new Store<StoreSchema & PrivateSchema>({
     ],
     mailTrustedSenders: [],
     newsFollow: ['games', 'tech', 'world', 'sports'],
+    watchlist: [],
+    myProviders: [],
+    watchProvidersSeen: {},
     radarCache: null,
     newsCache: null,
     radarSeen: { free: [], news: [] },
@@ -140,7 +145,7 @@ if (!store.get('onboardingMigrated')) {
 }
 
 const PUBLIC_KEYS = new Set<StoreKey>([
-  'sidebarCollapsed', 'lastView', 'perfLayout', 'quests', 'launchers', 'stations', 'playlists', 'volume', 'vaultCategories', 'settings', 'manualGames', 'hiddenGames', 'playtime', 'wishlist', 'newsSources', 'notifications', 'lastSeenVersion', 'profile', 'onboarded', 'mailAccounts', 'mailCategories', 'mailRules', 'mailTrustedSenders', 'newsFollow'
+  'sidebarCollapsed', 'lastView', 'perfLayout', 'quests', 'launchers', 'stations', 'playlists', 'volume', 'vaultCategories', 'settings', 'manualGames', 'hiddenGames', 'playtime', 'wishlist', 'newsSources', 'notifications', 'lastSeenVersion', 'profile', 'onboarded', 'mailAccounts', 'mailCategories', 'mailRules', 'mailTrustedSenders', 'newsFollow', 'watchlist', 'myProviders'
 ])
 
 /** Keys included in backups (everything user-authored except secrets and Spotify auth). */
